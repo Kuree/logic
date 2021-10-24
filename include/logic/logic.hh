@@ -12,6 +12,9 @@ namespace logic {
 template <uint64_t size>
 struct big_num;
 
+// some constants
+constexpr uint64_t big_num_threshold = sizeof(uint64_t) * 8;
+
 namespace util {
 // compute the holder type
 static constexpr bool in_range(uint64_t a, uint64_t min, uint64_t max) {
@@ -19,6 +22,10 @@ static constexpr bool in_range(uint64_t a, uint64_t min, uint64_t max) {
 }
 
 static constexpr bool gte(uint64_t a, uint64_t min) { return a >= min; }
+
+static constexpr uint64_t abs_diff(uint64_t a, uint64_t b) {
+    return (a > b)? (a - b): (b - a);
+}
 
 template <uint64_t s, typename enable = void>
 struct get_golder_type;
@@ -50,15 +57,14 @@ struct get_golder_type<s, typename std::enable_if<gte(s, 65)>::type> {
 template <uint64_t size>
 struct big_num {
 public:
-    constexpr static auto value_size = sizeof(uint64_t) * 8;
-    constexpr static auto s = (size + 1) / value_size;
+    constexpr static auto s = (size + 1) / big_num_threshold;
     // use uint64_t as a holder
     std::array<uint64_t, s> values;
 
     bool inline operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
-            auto a = idx / value_size;
-            auto b = idx % value_size;
+            auto a = idx / big_num_threshold;
+            auto b = idx % big_num_threshold;
             return (values[a] >> b) & 1;
         } else {
             return false;
@@ -70,10 +76,10 @@ public:
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
-            auto &value = values[i / value_size];
+            auto &value = values[i / big_num_threshold];
             auto c = *iter;
             if (c == '1') {
-                value |= 1u << (i % value_size);
+                value |= 1u << (i % big_num_threshold);
             }
             iter++;
             if (iter == v.rend()) break;
@@ -94,18 +100,39 @@ public:
     using T = typename util::get_golder_type<size>::type;
 
     bool signed_ = false;
+    // by default MSB first
+    bool big_endian = true;
     T value;
 
     bool inline operator[](uint64_t idx) const {
-        if constexpr (size <= 64) {
+        if constexpr (size <= big_num_threshold) {
             return (value >> idx) & 1;
         } else {
             return value[idx];
         }
     }
 
+    template <uint64_t a, uint64_t b>
+    bits<util::abs_diff(a, b)> inline operator()() const {
+        // assume the import has type-checked properly, e.g. by a compiler
+        uint64_t max = a, min = b;
+        if (!big_endian) std::swap(max, min);
+        bits<util::abs_diff(a, b)>result;
+        if constexpr (size <= big_num_threshold) {
+            auto const default_mask = std::numeric_limits<T>::max();
+            auto mask = default_mask << min;
+            mask &= (default_mask >> (size - max));
+            result.value = value & mask;
+            result.value >>= min;
+        } else {
+
+        }
+
+        return result;
+    }
+
     explicit bits(const std::string_view &v) {
-        if constexpr (size <= 64) {
+        if constexpr (size <= big_num_threshold) {
             // normal number
             value = 0;
             auto iter = v.rbegin();
