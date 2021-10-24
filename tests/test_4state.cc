@@ -54,3 +54,11 @@ TEST(logic, init) { // NOLINT
         EXPECT_EQ(s, ss.str());
     }
 }
+
+
+TEST(logic, slice) {    // NOLINT
+    {
+        logic::bits<40> l(42);
+        auto s = l.slice<3, 0>();
+    }
+}

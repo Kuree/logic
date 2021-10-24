@@ -71,6 +71,19 @@ public:
         }
     }
 
+    void set(uint64_t idx, bool value) {
+        if (idx < size) [[likely]] {
+            auto a = idx / big_num_threshold;
+            auto b = idx % big_num_threshold;
+            if (value) {
+                values[a] |= 1ull << b;
+            } else {
+                values[a] &= ~(1ull << b);
+            }
+        }
+    }
+
+
     explicit big_num(const std::string_view &v) {
         std::fill(values.begin(), values.end(), 0);
         auto iter = v.rbegin();
@@ -84,6 +97,18 @@ public:
             iter++;
             if (iter == v.rend()) break;
         }
+    }
+
+    template <uint64_t a, uint64_t b>
+    big_num<util::abs_diff(a, b) + 1> inline slice() const {
+        big_num<util::abs_diff(a, b) + 1> res;
+        auto max = a, min = b;
+        if (min > max) std::swap(min, max);
+        for (uint64_t i = min; i <= max; i++) {
+            auto idx = i - min;
+            res.set(idx, this->operator[](i));
+        }
+        return res;
     }
 
     big_num() = default;
@@ -100,8 +125,6 @@ public:
     using T = typename util::get_golder_type<size>::type;
 
     bool signed_ = false;
-    // by default MSB first
-    bool big_endian = true;
     T value;
 
     bool inline operator[](uint64_t idx) const {
@@ -113,11 +136,11 @@ public:
     }
 
     template <uint64_t a, uint64_t b>
-    bits<util::abs_diff(a, b)> inline operator()() const {
+    bits<util::abs_diff(a, b) + 1> inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
         uint64_t max = a, min = b;
-        if (!big_endian) std::swap(max, min);
-        bits<util::abs_diff(a, b)>result;
+        if (min > max) std::swap(max, min);
+        bits<util::abs_diff(a, b) + 1>result;
         if constexpr (size <= big_num_threshold) {
             auto const default_mask = std::numeric_limits<T>::max();
             auto mask = default_mask << min;
@@ -125,7 +148,13 @@ public:
             result.value = value & mask;
             result.value >>= min;
         } else {
-
+            auto res = value.template slice<a, b>();
+            if constexpr (util::abs_diff(a, b) < big_num_threshold) {
+                // shrink it back to normal variable
+                result.value = res.values[0];
+            } else {
+                result = res;
+            }
         }
 
         return result;
