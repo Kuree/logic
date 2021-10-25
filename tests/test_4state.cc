@@ -58,7 +58,35 @@ TEST(logic, init) { // NOLINT
 
 TEST(logic, slice) {    // NOLINT
     {
-        logic::bits<40> l(42);
-        auto s = l.slice<3, 0>();
+        // integer holder
+        logic::logic<40> l(42);
+        auto s = l.slice<3, 2>();
+        EXPECT_EQ(s.str(), "10");
+    }
+
+    {
+        // big number holder slice small
+        std::stringstream ss;
+        auto constexpr ref = "1011";
+        ss << ref;
+        for (auto i = 0; i < 100; i++) ss << '0';
+        logic::logic<120> l(ss.str());
+        auto s = l.slice<103, 100>();
+        EXPECT_EQ(ref, s.str());
+    }
+
+    {
+        // big number holder slice big
+        std::stringstream ss;
+        auto constexpr ref = "1011";
+        ss << ref;
+        for (auto i = 0; i < 100; i++) ss << '1';
+        logic::logic<120> l(ss.str());
+        auto s = l.slice<103, 42>();
+        ss = std::stringstream();
+        ss << ref;
+        for (auto i = 0; i < 100 -42; i++) ss << "1";
+        auto result = ss.str();
+        EXPECT_EQ(result, s.str());
     }
 }

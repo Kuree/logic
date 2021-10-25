@@ -18,13 +18,30 @@ constexpr uint64_t big_num_threshold = sizeof(uint64_t) * 8;
 
 namespace util {
 // compute the holder type
-static constexpr bool in_range(uint64_t a, uint64_t min, uint64_t max) {
-    return a >= min and a <= max;
+constexpr bool in_range(uint64_t a, uint64_t min, uint64_t max) { return a >= min and a <= max; }
+
+template <typename T>
+constexpr T max(T a, T b) {
+    return a > b ? a : b;
+}
+
+template <typename T>
+constexpr T min(T a, T b) {
+    return a > b ? b : a;
+}
+
+template <typename T, typename K>
+void copy(T &dst, const K &src, uint64_t start, uint64_t end) {
+    for (auto i = 0; i <= end - start; i++) {
+        dst[i] = src[i + start];
+    }
 }
 
 static constexpr bool gte(uint64_t a, uint64_t min) { return a >= min; }
 
-static constexpr uint64_t abs_diff(uint64_t a, uint64_t b) { return (a > b) ? (a - b) : (b - a); }
+constexpr uint64_t abs_diff(uint64_t a, uint64_t b) { return (a > b) ? (a - b) : (b - a); }
+
+constexpr bool native_num(uint64_t size) { return size <= big_num_threshold; }
 
 template <uint64_t s, bool signed_, typename enable = void>
 struct get_holder_type;
@@ -78,7 +95,8 @@ struct get_holder_type<s, signed_, typename std::enable_if<gte(s, 65)>::type> {
 template <uint64_t size, bool signed_>
 struct big_num {
 public:
-    constexpr static auto s = (size + 1) / big_num_threshold;
+    constexpr static auto s =
+        (size % big_num_threshold) == 0 ? size / big_num_threshold : (size / big_num_threshold) + 1;
     // use uint64_t as a holder
     std::array<uint64_t, s> values;
 
@@ -104,7 +122,11 @@ public:
         }
     }
 
-    explicit big_num(const std::string_view &v) {
+    template <typename T>
+    requires std::is_arithmetic_v<T>
+    [[maybe_unused]] explicit big_num(T v) : values({v}) {}
+
+    explicit big_num(std::string_view v) {
         std::fill(values.begin(), values.end(), 0);
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
@@ -112,7 +134,7 @@ public:
             auto &value = values[i / big_num_threshold];
             auto c = *iter;
             if (c == '1') {
-                value |= 1u << (i % big_num_threshold);
+                value |= 1ull << (i % big_num_threshold);
             }
             iter++;
             if (iter == v.rend()) break;
@@ -120,10 +142,16 @@ public:
     }
 
     template <uint64_t a, uint64_t b>
-    big_num<util::abs_diff(a, b) + 1> inline slice() const {
+    requires(util::max(a, b) < size) big_num<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
+        if constexpr (size <= util::max(a, b)) {
+            // out of bound access
+            return bits<util::abs_diff(a, b) + 1, false>(0);
+        }
+
         big_num<util::abs_diff(a, b) + 1> res;
-        auto max = a, min = b;
-        if (min > max) std::swap(min, max);
+        constexpr auto max = util::max(a, b);
+        constexpr auto min = util::min(a, b);
         for (uint64_t i = min; i <= max; i++) {
             auto idx = i - min;
             res.set(idx, this->operator[](i));
@@ -131,7 +159,8 @@ public:
         return res;
     }
 
-    big_num() = default;
+    // set values to 0 when initialized
+    big_num() { std::fill(values.begin(), values.end(), 0); }
 };
 
 template <uint64_t size, bool signed_ = false>
@@ -154,32 +183,55 @@ public:
         }
     }
 
+    /*
+     * Slice always produce unsigned result
+     */
+    /*
+     * native holder always produce native numbers
+     */
     template <uint64_t a, uint64_t b>
-    bits<util::abs_diff(a, b) + 1> inline slice() const {
+    requires(util::max(a, b) < size && util::native_num(size)) bits<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
-        uint64_t max = a, min = b;
-        if (min > max) std::swap(max, min);
-        bits<util::abs_diff(a, b) + 1> result;
-        if constexpr (size <= big_num_threshold) {
-            auto const default_mask = std::numeric_limits<T>::max();
-            auto mask = default_mask << min;
-            mask &= (default_mask >> (size - max));
-            result.value = value & mask;
-            result.value >>= min;
-        } else {
-            auto res = value.template slice<a, b>();
-            if constexpr (util::abs_diff(a, b) < big_num_threshold) {
-                // shrink it back to normal variable
-                result.value = res.values[0];
-            } else {
-                result = res;
-            }
-        }
+        constexpr auto max = util::max(a, b);
+        constexpr auto min = util::min(a, b);
+        bits<util::abs_diff(a, b) + 1, false> result;
+        auto const default_mask = std::numeric_limits<T>::max();
+        auto mask = default_mask << min;
+        mask &= (default_mask >> (size - max));
+        result.value = value & mask;
+        result.value >>= min;
 
         return result;
     }
 
-    explicit bits(const std::string_view &v) {
+    /*
+     * big number but small slice
+     */
+    template <uint64_t a, uint64_t b>
+    requires(util::max(a, b) < size && !util::native_num(size) &&
+             util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
+        bits<util::abs_diff(a, b) + 1, false> result;
+        auto res = value.template slice<a, b>();
+        // need to shrink it down
+        result.value = res.values[0];
+        return result;
+    }
+
+    /*
+     * big number and big slice
+     */
+    template <uint64_t a, uint64_t b>
+    requires(util::max(a, b) < size && !util::native_num(size) &&
+             !util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
+        bits<util::abs_diff(a, b) + 1, false> result;
+        result.value = value.template slice<a, b>();
+        return result;
+    }
+
+    explicit bits(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
             value = 0;
@@ -199,7 +251,10 @@ public:
         }
     }
 
-    explicit bits(T v) : value(v) {}
+    explicit bits(T v) requires(util::native_num(size)) : value(v) {}
+    template <typename K>
+    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit bits(K v) : value(v) {}
+
     bits() = default;
 };
 
@@ -237,12 +292,19 @@ struct logic {
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
-    explicit logic(T value) : value(bits<size>(value)) {
+    explicit logic(T value) requires(size <= big_num_threshold) : value(bits<size>(value)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
-    explicit logic(const std::string_view &v) : value(bits<size>(v)) {
+    template <typename K>
+    requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit logic(K value)
+        : value(bits<size>(value)) {
+        std::fill(x_mask.begin(), x_mask.end(), false);
+        std::fill(z_mask.begin(), z_mask.end(), false);
+    }
+
+    explicit logic(std::string_view v) : value(bits<size>(v)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
         auto iter = v.rbegin();
@@ -261,6 +323,25 @@ struct logic {
             iter++;
             if (iter == v.rend()) break;
         }
+    }
+
+    template <uint64_t a, uint64_t b>
+    requires(util::max(a, b) < size) logic<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
+        if constexpr (size <= util::max(a, b)) {
+            // out of bound access
+            return logic<util::abs_diff(a, b) + 1, false>(0);
+        }
+
+        logic<util::abs_diff(a, b) + 1, false> result;
+        result.value = value.template slice<a, b>();
+        // copy over masks
+        constexpr auto max = util::max(a, b);
+        constexpr auto min = util::min(a, b);
+        util::copy(result.x_mask, x_mask, min, max);
+        util::copy(result.z_mask, z_mask, min, max);
+
+        return result;
     }
 
 private:
