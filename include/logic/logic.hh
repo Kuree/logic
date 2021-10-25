@@ -92,13 +92,15 @@ struct get_holder_type<s, signed_, typename std::enable_if<gte(s, 65)>::type> {
 };
 }  // namespace util
 
+using big_num_holder_type = uint64_t;
+
 template <uint64_t size, bool signed_>
 struct big_num {
 public:
     constexpr static auto s =
         (size % big_num_threshold) == 0 ? size / big_num_threshold : (size / big_num_threshold) + 1;
     // use uint64_t as a holder
-    std::array<uint64_t, s> values;
+    std::array<big_num_holder_type, s> values;
 
     bool inline operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
@@ -171,6 +173,7 @@ struct bits {
 private:
 public:
     static_assert(size > 0, "0 sized logic not allowed");
+    static constexpr bool native_num = util::native_num(size);
     using T = typename util::get_holder_type<size, signed_>::type;
 
     T value;
@@ -190,7 +193,7 @@ public:
      * native holder always produce native numbers
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size && util::native_num(size)) bits<util::abs_diff(a, b) + 1, false>
+    requires(util::max(a, b) < size && native_num) bits<util::abs_diff(a, b) + 1, false>
     inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto max = util::max(a, b);
@@ -209,7 +212,7 @@ public:
      * big number but small slice
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size && !util::native_num(size) &&
+    requires(util::max(a, b) < size && !native_num &&
              util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
     inline slice() const {
         bits<util::abs_diff(a, b) + 1, false> result;
@@ -223,7 +226,7 @@ public:
      * big number and big slice
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size && !util::native_num(size) &&
+    requires(util::max(a, b) < size && !native_num &&
              !util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
     inline slice() const {
         bits<util::abs_diff(a, b) + 1, false> result;
@@ -231,6 +234,50 @@ public:
         return result;
     }
 
+    // extension
+    // notice that we need to implement signed extension, for the result that's native holder
+    // C++ will handle that for us already.
+    template <uint64_t new_size>
+    requires(new_size > size && util::native_num(new_size)) bits<new_size> extend() {
+        return bits<new_size>(value);
+    }
+
+    // same size, just use the default copy constructor
+    template <uint64_t new_size>
+    requires(new_size == size) bits<new_size> extend() { return *this; }
+
+    // new size is smaller. this is just a slice
+    template <uint64_t new_size>
+    requires(new_size < size) bits<new_size> extend() { return slice<new_size - 1, 0>(); }
+
+    // native number, but extend to a big number
+    template <uint64_t new_size>
+    requires(new_size > size && !util::native_num(new_size) && native_num) bits<new_size> extend() {
+        bits<new_size> result;
+        // use C++ default semantics to cast
+        result.value.values[0] = static_cast<big_num_holder_type>(value);
+        if constexpr (signed_) {
+            for (auto i = 1; i < result.value.s; i++) {
+                // sign extension
+                result.value.valuies[1] = std::numeric_limits<big_num_holder_type>::max();
+            }
+        }
+        // if not we're fine since we set everything to zero when we start
+        return result;
+    }
+
+    // big number and gets extend to a big number
+    template <uint64_t new_size>
+    requires(new_size > size && !util::native_num(new_size) &&
+             !native_num) bits<new_size> extend() {
+        bits<new_size> result;
+
+        return result;
+    }
+
+    /*
+     * constructors
+     */
     explicit bits(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
