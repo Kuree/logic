@@ -343,6 +343,7 @@ public:
     /*
      * constructors
      */
+    constexpr explicit bits(const char *str) : bits(std::string_view(str)) {}
     explicit bits(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
@@ -472,6 +473,7 @@ struct logic {
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
+    constexpr explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit logic(std::string_view v) : value(bits<size>(v)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
@@ -495,6 +497,23 @@ struct logic {
 
 private:
 };
+
+namespace literals {
+// constexpr to parse SystemVerilog literals
+template <char... value>
+constexpr auto operator""_logic() {
+    constexpr std::array<char, sizeof...(value)> array = {value...};
+    // TODO. need to parse the syntax
+    auto constexpr mark_pos = array.find_first_of('\'');
+    // per SV standard, if size not specified, the default size is 32
+    constexpr uint64_t logic_size = 32;
+    if constexpr (mark_pos != array.end()) {
+        // need to convert size string to an actual integer
+
+    }
+    return logic<logic_size>();
+}
+}  // namespace literals
 
 }  // namespace logic
 #endif  // LOGIC_LOGIC_HH
