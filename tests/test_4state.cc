@@ -90,3 +90,12 @@ TEST(logic, slice) {    // NOLINT
         EXPECT_EQ(result, s.str());
     }
 }
+
+
+TEST(logic, literal) {  // NOLINT
+    using namespace logic::literals;
+    {
+        auto v = 42_logic;
+        EXPECT_EQ(v.value.value, 42ul);
+    }
+}

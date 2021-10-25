@@ -364,9 +364,10 @@ public:
         }
     }
 
-    explicit bits(T v) requires(util::native_num(size)) : value(v) {}
+    explicit constexpr bits(T v) requires(util::native_num(size)) : value(v) {}
     template <typename K>
-    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit bits(K v) : value(v) {}
+    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bits(K v)
+        : value(v) {}
 
     bits() = default;
 };
@@ -461,13 +462,14 @@ struct logic {
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
-    explicit logic(T value) requires(size <= big_num_threshold) : value(bits<size>(value)) {
+    explicit constexpr logic(T value) requires(size <= big_num_threshold)
+        : value(bits<size>(value)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
     template <typename K>
-    requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit logic(K value)
+    requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
         : value(bits<size>(value)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
@@ -498,21 +500,11 @@ struct logic {
 private:
 };
 
-namespace literals {
+inline namespace literals {
 // constexpr to parse SystemVerilog literals
-template <char... value>
-constexpr auto operator""_logic() {
-    constexpr std::array<char, sizeof...(value)> array = {value...};
-    // TODO. need to parse the syntax
-    auto constexpr mark_pos = array.find_first_of('\'');
-    // per SV standard, if size not specified, the default size is 32
-    constexpr uint64_t logic_size = 32;
-    if constexpr (mark_pos != array.end()) {
-        // need to convert size string to an actual integer
-
-    }
-    return logic<logic_size>();
-}
+// per SV standard, if size not specified, the default size is 32
+constexpr logic<32> operator""_logic(unsigned long long value) { return logic<32>(value); }
+constexpr logic<64> operator""_logic64(unsigned long long value) { return logic<64>(value); }
 }  // namespace literals
 
 }  // namespace logic
