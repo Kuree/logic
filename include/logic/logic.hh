@@ -47,12 +47,22 @@ template <uint64_t s, bool signed_, typename enable = void>
 struct get_holder_type;
 
 template <uint64_t s, bool signed_>
-struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 8) && !signed_>::type> {
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 1) && !signed_>::type> {
+    using type = bool;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 1) && signed_>::type> {
+    using type = bool;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 2, 8) && !signed_>::type> {
     using type = uint8_t;
 };
 
 template <uint64_t s, bool signed_>
-struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 8) && signed_>::type> {
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 2, 8) && signed_>::type> {
     using type = int8_t;
 };
 
@@ -102,6 +112,9 @@ public:
     // use uint64_t as a holder
     std::array<big_num_holder_type, s> values;
 
+    /*
+     * single bit
+     */
     bool inline operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
             auto a = idx / big_num_threshold;
@@ -112,6 +125,36 @@ public:
         }
     }
 
+    template <uint64_t idx>
+    requires(idx < size) void set(bool value) {
+        auto constexpr a = idx / big_num_threshold;
+        auto constexpr b = idx % big_num_threshold;
+        if (value) {
+            values[a] |= 1ull << b;
+        } else {
+            values[a] &= ~(1ull << b);
+        }
+    }
+
+    template <uint64_t idx, bool value>
+    requires(idx < size) void set() {
+        auto constexpr a = idx / big_num_threshold;
+        auto constexpr b = idx % big_num_threshold;
+        if constexpr (value) {
+            values[a] |= 1ull << b;
+        } else {
+            values[a] &= ~(1ull << b);
+        }
+    }
+
+    template <uint64_t idx>
+    requires(idx < size) [[nodiscard]] bool inline get() const {
+        auto a = idx / big_num_threshold;
+        auto b = idx % big_num_threshold;
+        return (values[a] >> b) & 1;
+    }
+
+    // single bit
     void set(uint64_t idx, bool value) {
         if (idx < size) [[likely]] {
             auto a = idx / big_num_threshold;
@@ -127,21 +170,6 @@ public:
     template <typename T>
     requires std::is_arithmetic_v<T>
     [[maybe_unused]] explicit big_num(T v) : values({v}) {}
-
-    explicit big_num(std::string_view v) {
-        std::fill(values.begin(), values.end(), 0);
-        auto iter = v.rbegin();
-        for (auto i = 0u; i < size; i++) {
-            // from right to left
-            auto &value = values[i / big_num_threshold];
-            auto c = *iter;
-            if (c == '1') {
-                value |= 1ull << (i % big_num_threshold);
-            }
-            iter++;
-            if (iter == v.rend()) break;
-        }
-    }
 
     template <uint64_t a, uint64_t b>
     requires(util::max(a, b) < size) big_num<util::abs_diff(a, b) + 1, false>
@@ -161,6 +189,35 @@ public:
         return res;
     }
 
+    template <uint64_t new_size>
+    requires(new_size > size) big_num<new_size, signed_> extend()
+    const {
+        big_num<new_size, signed_> result;
+        util::copy(result.values, values, 0, s);
+        // based on the sign, need to fill out leading ones
+        if constexpr (signed_) {
+            for (uint64_t i = size; i < new_size; i++) {
+                set<i>(true);
+            }
+        }
+    }
+
+    // constructors
+    explicit big_num(std::string_view v) {
+        std::fill(values.begin(), values.end(), 0);
+        auto iter = v.rbegin();
+        for (auto i = 0u; i < size; i++) {
+            // from right to left
+            auto &value = values[i / big_num_threshold];
+            auto c = *iter;
+            if (c == '1') {
+                value |= 1ull << (i % big_num_threshold);
+            }
+            iter++;
+            if (iter == v.rend()) break;
+        }
+    }
+
     // set values to 0 when initialized
     big_num() { std::fill(values.begin(), values.end(), 0); }
 };
@@ -178,12 +235,18 @@ public:
 
     T value;
 
+    // single bit
     bool inline operator[](uint64_t idx) const {
         if constexpr (size <= big_num_threshold) {
             return (value >> idx) & 1;
         } else {
             return value[idx];
         }
+    }
+
+    template <uint64_t idx>
+    requires(idx < size && native_num) [[nodiscard]] bool inline get() const {
+        return (value >> idx) & 1;
     }
 
     /*
@@ -238,21 +301,23 @@ public:
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
     template <uint64_t new_size>
-    requires(new_size > size && util::native_num(new_size)) bits<new_size> extend() {
-        return bits<new_size>(value);
-    }
+    requires(new_size > size && util::native_num(new_size)) bits<new_size> extend()
+    const { return bits<new_size>(value); }
 
     // same size, just use the default copy constructor
     template <uint64_t new_size>
-    requires(new_size == size) bits<new_size> extend() { return *this; }
+    requires(new_size == size) bits<new_size> extend()
+    const { return *this; }
 
     // new size is smaller. this is just a slice
     template <uint64_t new_size>
-    requires(new_size < size) bits<new_size> extend() { return slice<new_size - 1, 0>(); }
+    requires(new_size < size) bits<new_size> extend()
+    const { return slice<new_size - 1, 0>(); }
 
     // native number, but extend to a big number
     template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) && native_num) bits<new_size> extend() {
+    requires(new_size > size && !util::native_num(new_size) && native_num) bits<new_size> extend()
+    const {
         bits<new_size> result;
         // use C++ default semantics to cast
         result.value.values[0] = static_cast<big_num_holder_type>(value);
@@ -266,10 +331,10 @@ public:
         return result;
     }
 
-    // big number and gets extend to a big number
+    // big number and gets extended to a big number
     template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) &&
-             !native_num) bits<new_size> extend() {
+    requires(new_size > size && !util::native_num(new_size) && !native_num) bits<new_size> extend()
+    const {
         bits<new_size> result;
 
         return result;
@@ -333,6 +398,62 @@ struct logic {
         return ss.str();
     }
 
+    /*
+     * single bit
+     */
+    inline logic<1> operator[](uint64_t idx) const {
+        if (idx < size) [[likely]] {
+            logic<1> r;
+            if (x_mask[idx]) [[unlikely]] {
+                r.x_mask[idx] = true;
+            } else if (z_mask[idx]) [[unlikely]] {
+                r.z_mask[idx] = true;
+            } else {
+                r.value = value[idx];
+            }
+            return r;
+        } else {
+            return logic<1>(false);
+        }
+    }
+    template <uint64_t idx>
+    requires(idx < size) [[nodiscard]] inline logic<1> get() const {
+        logic<1> r;
+        if (x_mask[idx]) [[unlikely]] {
+            r.x_mask[idx] = true;
+        } else if (z_mask[idx]) [[unlikely]] {
+            r.z_mask[idx] = true;
+        } else {
+            r.value = value.template get<idx>();
+        }
+        return r;
+    }
+
+    /*
+     * slices
+     */
+    template <uint64_t a, uint64_t b>
+    requires(util::max(a, b) < size) logic<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
+        if constexpr (size <= util::max(a, b)) {
+            // out of bound access
+            return logic<util::abs_diff(a, b) + 1, false>(0);
+        }
+
+        logic<util::abs_diff(a, b) + 1, false> result;
+        result.value = value.template slice<a, b>();
+        // copy over masks
+        constexpr auto max = util::max(a, b);
+        constexpr auto min = util::min(a, b);
+        util::copy(result.x_mask, x_mask, min, max);
+        util::copy(result.z_mask, z_mask, min, max);
+
+        return result;
+    }
+
+    /*
+     * constructors
+     */
     // by default everything is x
     logic() {
         std::fill(x_mask.begin(), x_mask.end(), true);
@@ -370,25 +491,6 @@ struct logic {
             iter++;
             if (iter == v.rend()) break;
         }
-    }
-
-    template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size) logic<util::abs_diff(a, b) + 1, false>
-    inline slice() const {
-        if constexpr (size <= util::max(a, b)) {
-            // out of bound access
-            return logic<util::abs_diff(a, b) + 1, false>(0);
-        }
-
-        logic<util::abs_diff(a, b) + 1, false> result;
-        result.value = value.template slice<a, b>();
-        // copy over masks
-        constexpr auto max = util::max(a, b);
-        constexpr auto min = util::min(a, b);
-        util::copy(result.x_mask, x_mask, min, max);
-        util::copy(result.z_mask, z_mask, min, max);
-
-        return result;
     }
 
 private:
