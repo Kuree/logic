@@ -402,7 +402,12 @@ template <uint64_t size>
 struct mask {
 public:
     mask() = default;
-    [[maybe_unused]] explicit mask(bool value) { data.fill(value); }
+    [[maybe_unused]] explicit mask(bool value) {
+        if (value)
+            data.fill(std::numeric_limits<uint8_t>::max());
+        else
+            data.fill(0);
+    }
 
     bool operator[](uint64_t idx) const {
         return (data[idx / byte_size]) & (1 << (idx % byte_size));
@@ -438,12 +443,32 @@ public:
         return check_any<size, 0>();
     }
 
-private:
+    template <uint64_t s, uint64_t start>
+    void copy(mask<s> &dst) const {
+        if constexpr (start % 8 == 0) {
+            auto constexpr start_i = start / 8;
+            auto constexpr num_bytes = s / 8;
+            auto constexpr end = num_bytes * 8;
+            uint64_t i;
+            for (i = 0u; i < end && i < s; i += 8) {
+                dst.data[i % 8] = data[start_i + i];
+            }
+            // then copy the rest
+            for (; i < s; i++) {
+                dst.data[i] = data[num_bytes * 8 + i];
+            }
+        } else {
+            // not aligned properly
+            util::copy(dst, *this, start, start + s);
+        }
+    }
+
     static constexpr auto byte_size = 8;
     static constexpr auto array_size =
         (size % byte_size == 0) ? size / byte_size : size / byte_size + 1;
-    std::array<bool, array_size> data;
+    std::array<uint8_t, array_size> data;
 
+private:
     template <uint64_t s, uint64_t start>
     requires((s - start) < 8) [[nodiscard]] bool check_any() const {
         return std::any_of(data.begin() + start, data.begin() + s, [](auto b) { return b; });
@@ -529,13 +554,13 @@ struct logic {
             return logic<util::abs_diff(a, b) + 1, false>(0);
         }
 
-        logic<util::abs_diff(a, b) + 1, false> result;
+        constexpr auto result_size = util::abs_diff(a, b) + 1u;
+        logic<result_size, false> result;
         result.value = value.template slice<a, b>();
         // copy over masks
-        constexpr auto max = util::max(a, b);
         constexpr auto min = util::min(a, b);
-        util::copy(result.x_mask, x_mask, min, max);
-        util::copy(result.z_mask, z_mask, min, max);
+        x_mask.template copy<result_size, min>(result.x_mask);
+        z_mask.template copy<result_size, min>(result.z_mask);
 
         return result;
     }
