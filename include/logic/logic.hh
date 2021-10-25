@@ -235,6 +235,19 @@ public:
 
     T value;
 
+    // basic formatting
+    [[nodiscard]] std::string str() const {
+        std::stringstream ss;
+        for (auto i = 0; i < size; i++) {
+            if (operator[](i)) {
+                ss << '1';
+            } else {
+                ss << '0';
+            }
+        }
+        return ss.str();
+    }
+
     // single bit
     bool inline operator[](uint64_t idx) const {
         if constexpr (size <= big_num_threshold) {
@@ -338,6 +351,19 @@ public:
         bits<new_size> result;
 
         return result;
+    }
+
+    /*
+     * concatenation
+     */
+    template <uint64_t arg0_size>
+    bits<size + arg0_size> concat(const bits<arg0_size> &arg0) {
+        return bits<size + arg0_size>(value << arg0_size | arg0.value);
+    }
+
+    template <typename U, typename... Ts>
+    auto concat(U arg0, Ts... args) {
+        return concat(arg0).concat(args...);
     }
 
     /*
