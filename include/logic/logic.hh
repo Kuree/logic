@@ -33,7 +33,7 @@ constexpr T min(T a, T b) {
 template <typename T, typename K>
 void copy(T &dst, const K &src, uint64_t start, uint64_t end) {
     for (auto i = 0; i <= end - start; i++) {
-        dst[i] = src[i + start];
+        dst.set(i, src[i + start]);
     }
 }
 
@@ -404,9 +404,34 @@ public:
     mask() = default;
     [[maybe_unused]] explicit mask(bool value) { data.fill(value); }
 
-    bool operator[](uint64_t idx) const { return data[idx]; }
-    bool &operator[](uint64_t idx) { return data[idx]; }
-
+    bool operator[](uint64_t idx) const {
+        return (data[idx / byte_size]) & (1 << (idx % byte_size));
+    }
+    template <uint64_t idx>
+    requires(idx < size) [[nodiscard]] bool get() const {
+        auto constexpr s = idx / byte_size;
+        auto constexpr i = idx % byte_size;
+        return data[s] & (1 << i);
+    }
+    void set(uint64_t idx, bool value) {
+        auto s = idx / byte_size;
+        auto i = idx % byte_size;
+        if (value) {
+            data[s] |= 1 << i;
+        } else {
+            data[s] &= ~(1 << i);
+        }
+    }
+    template <uint64_t idx, bool value>
+    requires(idx < size) void set() {
+        auto constexpr s = idx / byte_size;
+        auto constexpr i = idx % byte_size;
+        if constexpr (value) {
+            data[s] |= 1 << i;
+        } else {
+            data[s] &= ~(1 << i);
+        }
+    }
 
     [[nodiscard]] bool any_set() const {
         // we check on every byte boundary
@@ -414,18 +439,21 @@ public:
     }
 
 private:
-    std::array<bool, size> data;
+    static constexpr auto byte_size = 8;
+    static constexpr auto array_size =
+        (size % byte_size == 0) ? size / byte_size : size / byte_size + 1;
+    std::array<bool, array_size> data;
 
-    template <uint64_t s, uint64_t start> requires ((s - start) < 8)
-    [[nodiscard]] bool check_any() const {
+    template <uint64_t s, uint64_t start>
+    requires((s - start) < 8) [[nodiscard]] bool check_any() const {
         return std::any_of(data.begin() + start, data.begin() + s, [](auto b) { return b; });
     }
 
-    template <uint64_t s, uint64_t start> requires ((s - start) >= 8 && (start % 8 == 0))
-        [[nodiscard]] bool check_any() const {
+    template <uint64_t s, uint64_t start>
+    requires((s - start) >= 8 && (start % 8 == 0)) [[nodiscard]] bool check_any() const {
         auto const *ptr = data.data() + start;
         // we assume that one bool is the same size as 1 byte
-        auto const *ptr_i = reinterpret_cast<const uint64_t*>(ptr);
+        auto const *ptr_i = reinterpret_cast<const uint64_t *>(ptr);
         const uint64_t i = *ptr_i;
         return (i != 0) || check_any<s, start + 8>();
     }
@@ -466,9 +494,9 @@ struct logic {
         if (idx < size) [[likely]] {
             logic<1> r;
             if (x_mask[idx]) [[unlikely]] {
-                r.x_mask[idx] = true;
+                r.x_mask.set(idx, true);
             } else if (z_mask[idx]) [[unlikely]] {
-                r.z_mask[idx] = true;
+                r.z_mask.set(idx, true);
             } else {
                 r.value = value[idx];
             }
@@ -480,10 +508,10 @@ struct logic {
     template <uint64_t idx>
     requires(idx < size) [[nodiscard]] inline logic<1> get() const {
         logic<1> r;
-        if (x_mask[idx]) [[unlikely]] {
-            r.x_mask[idx] = true;
-        } else if (z_mask[idx]) [[unlikely]] {
-            r.z_mask[idx] = true;
+        if (x_mask.template get<idx>()) [[unlikely]] {
+            r.x_mask.set<idx, true>();
+        } else if (z_mask.template get<idx>) [[unlikely]] {
+            r.z_mask.set<idx, true>();
         } else {
             r.value = value.template get<idx>();
         }
@@ -533,10 +561,10 @@ struct logic {
             auto c = *iter;
             switch (c) {
                 case 'x':
-                    x_mask[i] = true;
+                    x_mask.set(i, true);
                     break;
                 case 'z':
-                    z_mask[i] = true;
+                    z_mask.set(i, true);
                     break;
                 default:;
             }
