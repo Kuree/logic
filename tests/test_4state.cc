@@ -107,3 +107,11 @@ TEST(logic, concat) { // NOLINT
         printf("%s\n", b.str().c_str());
     }
 }
+
+TEST(logic, mask) { // NOLINT
+    {
+        logic::logic<12> a("xx00zz");
+        EXPECT_TRUE(a.x_mask.any_set());
+
+    }
+}

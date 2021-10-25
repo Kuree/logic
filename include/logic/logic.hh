@@ -398,13 +398,46 @@ public:
     bits() = default;
 };
 
+template <uint64_t size>
+struct mask {
+public:
+    mask() = default;
+    [[maybe_unused]] explicit mask(bool value) { data.fill(value); }
+
+    bool operator[](uint64_t idx) const { return data[idx]; }
+    bool &operator[](uint64_t idx) { return data[idx]; }
+
+
+    [[nodiscard]] bool any_set() const {
+        // we check on every byte boundary
+        return check_any<size, 0>();
+    }
+
+private:
+    std::array<bool, size> data;
+
+    template <uint64_t s, uint64_t start> requires ((s - start) < 8)
+    [[nodiscard]] bool check_any() const {
+        return std::any_of(data.begin() + start, data.begin() + s, [](auto b) { return b; });
+    }
+
+    template <uint64_t s, uint64_t start> requires ((s - start) >= 8 && (start % 8 == 0))
+        [[nodiscard]] bool check_any() const {
+        auto const *ptr = data.data() + start;
+        // we assume that one bool is the same size as 1 byte
+        auto const *ptr_i = reinterpret_cast<const uint64_t*>(ptr);
+        const uint64_t i = *ptr_i;
+        return (i != 0) || check_any<s, start + 8>();
+    }
+};
+
 template <uint64_t size, bool signed_>
 struct logic {
     using T = typename util::get_holder_type<size, signed_>::type;
     bits<size> value;
     // by default every thing is x
-    std::array<bool, size> x_mask;
-    std::array<bool, size> z_mask;
+    mask<size> x_mask;
+    mask<size> z_mask;
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -483,28 +516,17 @@ struct logic {
      * constructors
      */
     // by default everything is x
-    logic() {
-        std::fill(x_mask.begin(), x_mask.end(), true);
-        std::fill(z_mask.begin(), z_mask.end(), false);
-    }
+    logic() : x_mask(true), z_mask(false) {}
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
-        : value(bits<size>(value)) {
-        std::fill(x_mask.begin(), x_mask.end(), false);
-        std::fill(z_mask.begin(), z_mask.end(), false);
-    }
+        : value(bits<size>(value)), x_mask(false), z_mask(false) {}
 
     template <typename K>
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bits<size>(value)) {
-        std::fill(x_mask.begin(), x_mask.end(), false);
-        std::fill(z_mask.begin(), z_mask.end(), false);
-    }
+        : value(bits<size>(value)), x_mask(false), z_mask(false) {}
 
     constexpr explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bits<size>(v)) {
-        std::fill(x_mask.begin(), x_mask.end(), false);
-        std::fill(z_mask.begin(), z_mask.end(), false);
+    explicit logic(std::string_view v) : value(bits<size>(v)), x_mask(false), z_mask(false) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
