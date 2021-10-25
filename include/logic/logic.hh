@@ -2,6 +2,7 @@
 #define LOGIC_LOGIC_HH
 
 #include <array>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -9,7 +10,7 @@
 
 namespace logic {
 
-template <uint64_t size>
+template <uint64_t size, bool signed_ = false>
 struct big_num;
 
 // some constants
@@ -23,38 +24,58 @@ static constexpr bool in_range(uint64_t a, uint64_t min, uint64_t max) {
 
 static constexpr bool gte(uint64_t a, uint64_t min) { return a >= min; }
 
-static constexpr uint64_t abs_diff(uint64_t a, uint64_t b) {
-    return (a > b)? (a - b): (b - a);
-}
+static constexpr uint64_t abs_diff(uint64_t a, uint64_t b) { return (a > b) ? (a - b) : (b - a); }
 
-template <uint64_t s, typename enable = void>
-struct get_golder_type;
-template <uint64_t s>
-struct get_golder_type<s, typename std::enable_if<in_range(s, 1, 8)>::type> {
+template <uint64_t s, bool signed_, typename enable = void>
+struct get_holder_type;
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 8) && !signed_>::type> {
     using type = uint8_t;
 };
-template <uint64_t s>
-struct get_golder_type<s, typename std::enable_if<in_range(s, 9, 16)>::type> {
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 1, 8) && signed_>::type> {
+    using type = int8_t;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 9, 16) && !signed_>::type> {
     using type = uint16_t;
 };
 
-template <uint64_t s>
-struct get_golder_type<s, typename std::enable_if<in_range(s, 17, 32)>::type> {
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 9, 16) && signed_>::type> {
+    using type = int16_t;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 17, 32) && !signed_>::type> {
     using type = uint32_t;
 };
 
-template <uint64_t s>
-struct get_golder_type<s, typename std::enable_if<in_range(s, 33, 64)>::type> {
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 17, 32) && signed_>::type> {
+    using type = int32_t;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 33, 64) && !signed_>::type> {
     using type = uint64_t;
 };
 
-template <uint64_t s>
-struct get_golder_type<s, typename std::enable_if<gte(s, 65)>::type> {
-    using type = big_num<s>;
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<in_range(s, 33, 64) && signed_>::type> {
+    using type = int64_t;
+};
+
+template <uint64_t s, bool signed_>
+struct get_holder_type<s, signed_, typename std::enable_if<gte(s, 65)>::type> {
+    using type = big_num<s, signed_>;
 };
 }  // namespace util
 
-template <uint64_t size>
+template <uint64_t size, bool signed_>
 struct big_num {
 public:
     constexpr static auto s = (size + 1) / big_num_threshold;
@@ -82,7 +103,6 @@ public:
             }
         }
     }
-
 
     explicit big_num(const std::string_view &v) {
         std::fill(values.begin(), values.end(), 0);
@@ -114,17 +134,16 @@ public:
     big_num() = default;
 };
 
-template <uint64_t size>
+template <uint64_t size, bool signed_ = false>
 struct logic;
 
-template <uint64_t size>
+template <uint64_t size, bool signed_ = false>
 struct bits {
 private:
 public:
     static_assert(size > 0, "0 sized logic not allowed");
-    using T = typename util::get_golder_type<size>::type;
+    using T = typename util::get_holder_type<size, signed_>::type;
 
-    bool signed_ = false;
     T value;
 
     bool inline operator[](uint64_t idx) const {
@@ -140,7 +159,7 @@ public:
         // assume the import has type-checked properly, e.g. by a compiler
         uint64_t max = a, min = b;
         if (min > max) std::swap(max, min);
-        bits<util::abs_diff(a, b) + 1>result;
+        bits<util::abs_diff(a, b) + 1> result;
         if constexpr (size <= big_num_threshold) {
             auto const default_mask = std::numeric_limits<T>::max();
             auto mask = default_mask << min;
@@ -180,13 +199,13 @@ public:
         }
     }
 
-    explicit bits(T v): value(v) {}
+    explicit bits(T v) : value(v) {}
     bits() = default;
 };
 
-template <uint64_t size>
+template <uint64_t size, bool signed_>
 struct logic {
-    using T = typename util::get_golder_type<size>::type;
+    using T = typename util::get_holder_type<size, signed_>::type;
     bits<size> value;
     // by default every thing is x
     std::array<bool, size> x_mask;
@@ -223,7 +242,7 @@ struct logic {
         std::fill(z_mask.begin(), z_mask.end(), false);
     }
 
-    explicit logic(const std::string_view &v): value(bits<size>(v)) {
+    explicit logic(const std::string_view &v) : value(bits<size>(v)) {
         std::fill(x_mask.begin(), x_mask.end(), false);
         std::fill(z_mask.begin(), z_mask.end(), false);
         auto iter = v.rbegin();
