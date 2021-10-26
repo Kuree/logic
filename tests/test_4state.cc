@@ -102,9 +102,9 @@ TEST(logic, literal) {  // NOLINT
 
 TEST(logic, concat) { // NOLINT
     {
-        logic::bits<4> a(1);
-        auto b = a.concat(logic::bits<4>(2), logic::bits<4>(3));
-        printf("%s\n", b.str().c_str());
+        logic::logic<4> a(1);
+        auto b = a.concat(logic::logic<4>(2), logic::logic<4>(3));
+        EXPECT_EQ("000100100011", b.str());
     }
 }
 

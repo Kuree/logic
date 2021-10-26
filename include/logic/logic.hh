@@ -200,6 +200,24 @@ public:
         }
     }
 
+    template <uint64_t ss>
+    auto concat(const big_num<ss> &num) const {
+        auto constexpr final_size = size + ss;
+        big_num<final_size> result;
+        // copy over the num one since it's on the LSB
+        // TODO: refactor code to support big/little endianness
+        for (auto i = 0u; i < num.s; i++) {
+            result.values[i] = num.values[i];
+        }
+        // then copy over the current on
+        for (auto i = ss; i < final_size; i++) {
+            auto idx = i - ss;
+            result.set(i, get(i));
+        }
+
+        return result;
+    }
+
     /*
      * mask related stuff
      */
@@ -418,7 +436,22 @@ public:
      */
     template <uint64_t arg0_size>
     bits<size + arg0_size> concat(const bits<arg0_size> &arg0) {
-        return bits<size + arg0_size>(value << arg0_size | arg0.value);
+        auto constexpr final_size = size + arg0_size;
+        if constexpr (native_num) {
+            return bits<final_size>(value << arg0_size | arg0.value);
+        } else {
+            auto res = bits<final_size>();
+            if constexpr (arg0.native_num) {
+                // convert to big num
+                big_num<arg0_size> b(arg0.value);
+                auto big_num = value.concat(b);
+                res.big_num = big_num;
+            } else {
+                auto big_num = value.concat(arg0.value);
+                res.big_num = big_num;
+            }
+            return res;
+        }
     }
 
     template <typename U, typename... Ts>
@@ -564,12 +597,29 @@ struct logic {
     }
 
     /*
+     * concatenation
+     */
+    template <uint64_t arg0_size>
+    logic<size + arg0_size> concat(const logic<arg0_size> &arg0) {
+        auto constexpr final_size = size + arg0_size;
+        auto res = logic<final_size>();
+        res.value = value.concat(arg0.value);
+        // concat masks as well
+        res.x_mask = x_mask.concat(arg0.x_mask);
+        res.z_mask = z_mask.concat(arg0.z_mask);
+        return res;
+    }
+
+    template <typename U, typename... Ts>
+    auto concat(U arg0, Ts... args) {
+        return concat(arg0).concat(args...);
+    }
+
+    /*
      * constructors
      */
     // by default everything is x
-    logic() {
-        x_mask.mask();
-    }
+    logic() { x_mask.mask(); }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
         : value(bits<size>(value)) {}
