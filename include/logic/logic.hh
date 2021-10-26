@@ -212,7 +212,7 @@ public:
         // then copy over the current on
         for (auto i = ss; i < final_size; i++) {
             auto idx = i - ss;
-            result.set(i, get(i));
+            result.set(i, get(idx));
         }
 
         return result;
@@ -519,18 +519,19 @@ template <uint64_t size, bool signed_>
 struct logic {
     using T = typename util::get_holder_type<size, signed_>::type;
     bits<size> value;
-    // by default every thing is x
-    bits<size> x_mask;
-    bits<size> z_mask;
+    // To reduce memory footprint, we use the following encoding scheme
+    // if xz_mask is off, value is the actual integer value
+    // if xz_mask is on, 0 in value means x and 1 means z
+    bits<size> xz_mask;
 
     // basic formatting
     [[nodiscard]] std::string str() const {
         std::stringstream ss;
         for (auto i = 0; i < size; i++) {
             uint64_t idx = size - i - 1;
-            if (x_mask[idx]) {
+            if (x_set(idx)) {
                 ss << 'x';
-            } else if (z_mask[idx]) {
+            } else if (z_set(idx)) {
                 ss << 'z';
             } else {
                 if (value[idx]) {
@@ -549,10 +550,10 @@ struct logic {
     inline logic<1> operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
             logic<1> r;
-            if (x_mask[idx]) [[unlikely]] {
-                r.x_mask.set(idx, true);
-            } else if (z_mask[idx]) [[unlikely]] {
-                r.z_mask.set(idx, true);
+            if (x_set(idx)) [[unlikely]] {
+                r.set_x(idx);
+            } else if (z_set(idx)) [[unlikely]] {
+                r.set_z(idx);
             } else {
                 r.value = value[idx];
             }
@@ -565,14 +566,73 @@ struct logic {
     template <uint64_t idx>
     requires(idx < size) [[nodiscard]] inline logic<1> get() const {
         logic<1> r;
-        if (x_mask.template get<idx>()) [[unlikely]] {
-            r.x_mask.set<idx, true>();
-        } else if (z_mask.template get<idx>) [[unlikely]] {
-            r.z_mask.set<idx, true>();
+        if (this->template x_set<idx>()) [[unlikely]] {
+            r.set_x<idx>();
+        } else if (this->template z_set<idx>()) [[unlikely]] {
+            r.set_z<idx>();
         } else {
             r.value = value.template get<idx>();
         }
         return r;
+    }
+
+    void set(uint64_t idx, bool v) {
+        value.set(idx, v);
+        // unmask bit
+        unmask_bit(idx);
+    }
+
+    template <uint64_t idx>
+    void set(bool v) {
+        value.template set<idx>(v);
+        this->template unmask_bit<idx>();
+    }
+
+    template <uint64_t idx, bool v>
+    void set() {
+        value.template set<idx, v>();
+        this->template unmask_bit<idx>();
+    }
+
+    void set(uint64_t idx, const logic<1> &l) {
+        value.set(idx, l.value[idx]);
+        xz_mask.set(idx, l.xz_mask[idx]);
+    }
+
+    [[nodiscard]] inline bool x_set(uint64_t idx) const { return xz_mask[idx] && !value[idx]; }
+
+    template <uint64_t idx>
+    [[nodiscard]] inline bool x_set() const {
+        return xz_mask.template get<idx>() && !value.template get<idx>();
+    }
+
+    [[nodiscard]] inline bool z_set(uint64_t idx) const { return xz_mask[idx] && value[idx]; }
+
+    template <uint64_t idx>
+    [[nodiscard]] inline bool z_set() const {
+        return xz_mask.template get<idx>() && value.template get<idx>();
+    }
+
+    inline void set_x(uint64_t idx) {
+        xz_mask.set(idx, true);
+        value.set(idx, false);
+    }
+
+    template <uint64_t idx>
+    inline void set_x() {
+        xz_mask.template set<idx, true>();
+        value.template set<idx, false>();
+    }
+
+    inline void set_z(uint64_t idx) {
+        xz_mask.set(idx, true);
+        value.set(idx, true);
+    }
+
+    template <uint64_t idx>
+    inline void set_z() {
+        xz_mask.template set<idx, true>();
+        value.template set<idx, true>();
     }
 
     /*
@@ -590,8 +650,7 @@ struct logic {
         logic<result_size, false> result;
         result.value = value.template slice<a, b>();
         // copy over masks
-        result.x_mask = x_mask.template slice<a, b>();
-        result.z_mask = z_mask.template slice<a, b>();
+        result.xz_mask = xz_mask.template slice<a, b>();
 
         return result;
     }
@@ -605,8 +664,7 @@ struct logic {
         auto res = logic<final_size>();
         res.value = value.concat(arg0.value);
         // concat masks as well
-        res.x_mask = x_mask.concat(arg0.x_mask);
-        res.z_mask = z_mask.concat(arg0.z_mask);
+        res.xz_mask = xz_mask.concat(arg0.xz_mask);
         return res;
     }
 
@@ -619,7 +677,7 @@ struct logic {
      * constructors
      */
     // by default everything is x
-    logic() { x_mask.mask(); }
+    logic() { xz_mask.mask(); }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
         : value(bits<size>(value)) {}
@@ -636,10 +694,10 @@ struct logic {
             auto c = *iter;
             switch (c) {
                 case 'x':
-                    x_mask.set(i, true);
+                    set_x(i);
                     break;
                 case 'z':
-                    z_mask.set(i, true);
+                    set_z(i);
                     break;
                 default:;
             }
@@ -648,7 +706,16 @@ struct logic {
         }
     }
 
+    // conversion from bits to logic
+    constexpr explicit logic(const bits<size, signed_> &b) : value(b) {}
+
 private:
+    void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
+
+    template <uint64_t idx>
+    void unmask_bit() {
+        xz_mask.template set<idx, false>();
+    }
 };
 
 inline namespace literals {

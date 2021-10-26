@@ -111,7 +111,7 @@ TEST(logic, concat) { // NOLINT
 TEST(logic, mask) { // NOLINT
     {
         logic::logic<12> a("xx00zz");
-        EXPECT_TRUE(a.x_mask.any_set());
-
+        EXPECT_TRUE(a.xz_mask.any_set());
+        EXPECT_NE(a.value.value, 0);
     }
 }
