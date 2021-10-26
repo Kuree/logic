@@ -1,8 +1,10 @@
 #ifndef LOGIC_LOGIC_HH
 #define LOGIC_LOGIC_HH
 
+#include <algorithm>
 #include <array>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -167,10 +169,6 @@ public:
         }
     }
 
-    template <typename T>
-    requires std::is_arithmetic_v<T>
-    [[maybe_unused]] explicit big_num(T v) : values({v}) {}
-
     template <uint64_t a, uint64_t b>
     requires(util::max(a, b) < size) big_num<util::abs_diff(a, b) + 1, false>
     inline slice() const {
@@ -202,6 +200,26 @@ public:
         }
     }
 
+    /*
+     * mask related stuff
+     */
+    [[nodiscard]] bool has_set() const {
+        // we use the fact that SIMD instructions are faster than compare and branch
+        // so summation is faster than any_of in theory
+        // also all unused bits are set to 0 by default
+        auto r = std::accumulate(values.begin(), values.end(), 0);
+        return r != 0;
+    }
+
+    [[maybe_unused]] void mask() {
+        for (auto i = 0u; i < (s - 1); i++) {
+            values[i] = std::numeric_limits<big_num_holder_type>::max();
+        }
+        // last bits
+        values[s - 1] =
+            std::numeric_limits<big_num_holder_type>::max() >> (s * big_num_threshold - size);
+    }
+
     // constructors
     explicit big_num(std::string_view v) {
         std::fill(values.begin(), values.end(), 0);
@@ -217,6 +235,10 @@ public:
             if (iter == v.rend()) break;
         }
     }
+
+    template <typename T>
+    requires std::is_arithmetic_v<T>
+    [[maybe_unused]] explicit big_num(T v) : values({v}) {}
 
     // set values to 0 when initialized
     big_num() { std::fill(values.begin(), values.end(), 0); }
@@ -250,7 +272,7 @@ public:
 
     // single bit
     bool inline operator[](uint64_t idx) const {
-        if constexpr (size <= big_num_threshold) {
+        if constexpr (native_num) {
             return (value >> idx) & 1;
         } else {
             return value[idx];
@@ -260,6 +282,44 @@ public:
     template <uint64_t idx>
     requires(idx < size && native_num) [[nodiscard]] bool inline get() const {
         return (value >> idx) & 1;
+    }
+
+    void inline set(uint64_t idx, bool v) {
+        if constexpr (native_num) {
+            if (v) {
+                value |= 1ull << idx;
+            } else {
+                value &= ~(1ull << idx);
+            }
+        } else {
+            value.set(idx, v);
+        }
+    }
+
+    template <uint64_t idx>
+    void set(bool v) {
+        if constexpr (idx < size) {
+            if (v) {
+                value |= 1ull << idx;
+            } else {
+                value &= ~(1ull << idx);
+            }
+        } else {
+            value.template set<idx>(v);
+        }
+    }
+
+    template <uint64_t idx, bool v>
+    void set() {
+        if constexpr (idx < size) {
+            if constexpr (v) {
+                value |= 1ull << idx;
+            } else {
+                value &= ~(1ull << idx);
+            }
+        } else {
+            value.template set<idx, v>();
+        }
     }
 
     /*
@@ -367,6 +427,24 @@ public:
     }
 
     /*
+     * mask related stuff
+     */
+    [[nodiscard]] bool any_set() const requires(native_num) {
+        // unused bits are always set to 0
+        return value != 0;
+    }
+
+    [[nodiscard]] bool any_set() const requires(!native_num) { return value.any_set(); }
+
+    void mask() {
+        if constexpr (native_num) {
+            value = std::numeric_limits<T>::max() >> (sizeof(T) * 8 - size);
+        } else {
+            value.mask();
+        }
+    }
+
+    /*
      * constructors
      */
     constexpr explicit bits(const char *str) : bits(std::string_view(str)) {}
@@ -395,92 +473,12 @@ public:
     requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bits(K v)
         : value(v) {}
 
-    bits() = default;
-};
-
-template <uint64_t size>
-struct mask {
-public:
-    mask() = default;
-    [[maybe_unused]] explicit mask(bool value) {
-        if (value)
-            data.fill(std::numeric_limits<uint8_t>::max());
-        else
-            data.fill(0);
-    }
-
-    bool operator[](uint64_t idx) const {
-        return (data[idx / byte_size]) & (1 << (idx % byte_size));
-    }
-    template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] bool get() const {
-        auto constexpr s = idx / byte_size;
-        auto constexpr i = idx % byte_size;
-        return data[s] & (1 << i);
-    }
-    void set(uint64_t idx, bool value) {
-        auto s = idx / byte_size;
-        auto i = idx % byte_size;
-        if (value) {
-            data[s] |= 1 << i;
-        } else {
-            data[s] &= ~(1 << i);
+    bits() {
+        if constexpr (native_num) {
+            // init to 0
+            value = 0;
         }
-    }
-    template <uint64_t idx, bool value>
-    requires(idx < size) void set() {
-        auto constexpr s = idx / byte_size;
-        auto constexpr i = idx % byte_size;
-        if constexpr (value) {
-            data[s] |= 1 << i;
-        } else {
-            data[s] &= ~(1 << i);
-        }
-    }
-
-    [[nodiscard]] bool any_set() const {
-        // we check on every byte boundary
-        return check_any<size, 0>();
-    }
-
-    template <uint64_t s, uint64_t start>
-    void copy(mask<s> &dst) const {
-        if constexpr (start % 8 == 0) {
-            auto constexpr start_i = start / 8;
-            auto constexpr num_bytes = s / 8;
-            auto constexpr end = num_bytes * 8;
-            uint64_t i;
-            for (i = 0u; i < end && i < s; i += 8) {
-                dst.data[i % 8] = data[start_i + i];
-            }
-            // then copy the rest
-            for (; i < s; i++) {
-                dst.data[i] = data[num_bytes * 8 + i];
-            }
-        } else {
-            // not aligned properly
-            util::copy(dst, *this, start, start + s);
-        }
-    }
-
-    static constexpr auto byte_size = 8;
-    static constexpr auto array_size =
-        (size % byte_size == 0) ? size / byte_size : size / byte_size + 1;
-    std::array<uint8_t, array_size> data;
-
-private:
-    template <uint64_t s, uint64_t start>
-    requires((s - start) < 8) [[nodiscard]] bool check_any() const {
-        return std::any_of(data.begin() + start, data.begin() + s, [](auto b) { return b; });
-    }
-
-    template <uint64_t s, uint64_t start>
-    requires((s - start) >= 8 && (start % 8 == 0)) [[nodiscard]] bool check_any() const {
-        auto const *ptr = data.data() + start;
-        // we assume that one bool is the same size as 1 byte
-        auto const *ptr_i = reinterpret_cast<const uint64_t *>(ptr);
-        const uint64_t i = *ptr_i;
-        return (i != 0) || check_any<s, start + 8>();
+        // for big number it's already set to 0
     }
 };
 
@@ -489,8 +487,8 @@ struct logic {
     using T = typename util::get_holder_type<size, signed_>::type;
     bits<size> value;
     // by default every thing is x
-    mask<size> x_mask;
-    mask<size> z_mask;
+    bits<size> x_mask;
+    bits<size> z_mask;
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -530,6 +528,7 @@ struct logic {
             return logic<1>(false);
         }
     }
+
     template <uint64_t idx>
     requires(idx < size) [[nodiscard]] inline logic<1> get() const {
         logic<1> r;
@@ -558,9 +557,8 @@ struct logic {
         logic<result_size, false> result;
         result.value = value.template slice<a, b>();
         // copy over masks
-        constexpr auto min = util::min(a, b);
-        x_mask.template copy<result_size, min>(result.x_mask);
-        z_mask.template copy<result_size, min>(result.z_mask);
+        result.x_mask = x_mask.template slice<a, b>();
+        result.z_mask = z_mask.template slice<a, b>();
 
         return result;
     }
@@ -569,17 +567,19 @@ struct logic {
      * constructors
      */
     // by default everything is x
-    logic() : x_mask(true), z_mask(false) {}
+    logic() {
+        x_mask.mask();
+    }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
-        : value(bits<size>(value)), x_mask(false), z_mask(false) {}
+        : value(bits<size>(value)) {}
 
     template <typename K>
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bits<size>(value)), x_mask(false), z_mask(false) {}
+        : value(bits<size>(value)) {}
 
     constexpr explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bits<size>(v)), x_mask(false), z_mask(false) {
+    explicit logic(std::string_view v) : value(bits<size>(v)) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
