@@ -352,12 +352,12 @@ public:
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto max = util::max(a, b);
         constexpr auto min = util::min(a, b);
+        constexpr auto t_size = sizeof(T) * 8;
         bits<util::abs_diff(a, b) + 1, false> result;
-        auto const default_mask = std::numeric_limits<T>::max();
-        auto mask = default_mask << min;
-        mask &= (default_mask >> (size - max));
-        result.value = value & mask;
-        result.value >>= min;
+        constexpr auto default_mask = std::numeric_limits<T>::max();
+        uint64_t mask = default_mask << min;
+        mask &= (default_mask >> (t_size - max));
+        result.value = (value & mask) >> min;
 
         return result;
     }
@@ -671,6 +671,23 @@ struct logic {
     template <typename U, typename... Ts>
     auto concat(U arg0, Ts... args) {
         return concat(arg0).concat(args...);
+    }
+
+    /*
+     * unpacking, which is basically slicing as syntax sugars
+     */
+    template <uint64_t base, uint64_t arg0_size> requires (base < size)
+    void unpack(logic<arg0_size> &target) {
+        // TODO: implement endianness
+        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
+        target.value = value.template slice<base, upper_bound>();
+        target.xz_mask = xz_mask.template slice<base, upper_bound>();
+    }
+
+    template <uint64_t base=0, uint64_t arg0_size, typename... Ts>
+    auto unpack(logic<arg0_size> &logic0, Ts&... args) {
+        this->template unpack<base, arg0_size>(logic0);
+        this->template unpack<base + arg0_size>(args...);
     }
 
     /*

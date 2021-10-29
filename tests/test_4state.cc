@@ -115,3 +115,11 @@ TEST(logic, mask) { // NOLINT
         EXPECT_NE(a.value.value, 0);
     }
 }
+
+TEST(logic, unpack) {   // NOLINT
+    {
+        logic::logic<4> a, b, c;
+        auto d = logic::logic<12>("000100100011");
+        d.unpack(a, b, c);
+    }
+}
