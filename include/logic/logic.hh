@@ -982,6 +982,18 @@ struct logic {
         return *this;
     }
 
+    logic<size, signed_, big_endian> operator~() const {
+        // this is the truth table
+        //   0 1 x z
+        //   1 0 x x
+        logic<size, signed_, big_endian> result;
+        result.value = ~value;
+        result.xz_mask = xz_mask;
+        // change anything has xz_mask on to x
+        result.value &= ~result.xz_mask;
+        return result;
+    }
+
     /*
      * constructors
      */

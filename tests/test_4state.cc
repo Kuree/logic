@@ -252,3 +252,30 @@ TEST(logic, xor_) {  // NOLINT
         EXPECT_EQ("x", c.str());
     }
 }
+
+TEST(logic, not_) {  // NOLINT
+    {
+        logic::logic<1> a{"0"};
+        auto b = ~a;
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<1> a{"1"};
+        auto b = ~a;
+        EXPECT_EQ("0", b.str());
+    }
+
+    {
+        logic::logic<1> a{"x"};
+        auto b = ~a;
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<1> a{"z"};
+        auto b = ~a;
+        EXPECT_EQ("x", b.str());
+    }
+
+}
