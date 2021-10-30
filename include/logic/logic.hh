@@ -35,7 +35,7 @@ constexpr T min(T a, T b) {
 
 template <typename T, typename K>
 void copy(T &dst, const K &src, uint64_t start, uint64_t end) {
-    for (auto i = 0; i <= end - start; i++) {
+    for (auto i = 0u; i <= end - start; i++) {
         dst.set(i, src[i + start]);
     }
 }
@@ -592,7 +592,7 @@ struct logic {
     // basic formatting
     [[nodiscard]] std::string str() const {
         std::stringstream ss;
-        for (auto i = 0; i < size; i++) {
+        for (auto i = 0u; i < size; i++) {
             uint64_t idx = size - i - 1;
             if (x_set(idx)) {
                 ss << 'x';

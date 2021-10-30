@@ -37,7 +37,7 @@ TEST(logic, init) { // NOLINT
         logic::logic<40> l(v);
         auto s = l.str();
         std::stringstream ss;
-        for (auto i = 0; i < 40 - v.size(); i++) ss << '0';
+        for (auto i = 0u; i < 40u - v.size(); i++) ss << '0';
         ss << v;
         EXPECT_EQ(s, ss.str());
     }
@@ -49,7 +49,7 @@ TEST(logic, init) { // NOLINT
         logic::logic<128> l(v);
         auto s = l.str();
         std::stringstream ss;
-        for (auto i = 0; i < 128 - v.size(); i++) ss << '0';
+        for (auto i = 0u; i < 128u - v.size(); i++) ss << '0';
         ss << v;
         EXPECT_EQ(s, ss.str());
     }
