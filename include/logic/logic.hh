@@ -185,7 +185,7 @@ public:
     inline slice() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access
-            return bits<util::abs_diff(a, b) + 1, false>(0);
+            return bits<util::abs_diff(a, b) + 1, false, big_endian>(0);
         }
 
         big_num<util::abs_diff(a, b) + 1, false, big_endian> res;
@@ -379,7 +379,7 @@ public:
         bits<util::abs_diff(a, b) + 1, false, big_endian> result;
         constexpr auto default_mask = std::numeric_limits<T>::max();
         uint64_t mask = default_mask << min;
-        mask &= (default_mask >> (t_size - max));
+        mask &= (default_mask >> (t_size - max - 1));
         result.value = (value & mask) >> min;
 
         return result;
@@ -436,7 +436,7 @@ public:
     requires(new_size > size && !util::native_num(new_size) &&
              native_num) bits<new_size, signed_, big_endian> extend()
     const {
-        bits<new_size> result;
+        bits<new_size, signed_, big_endian> result;
         // use C++ default semantics to cast
         result.value.values[0] = static_cast<big_num_holder_type>(value);
         if constexpr (signed_) {
@@ -454,7 +454,7 @@ public:
     requires(new_size > size && !util::native_num(new_size) &&
              !native_num) bits<new_size, signed_, big_endian> extend()
     const {
-        bits<new_size> result;
+        bits<new_size, signed_, big_endian> result;
         // TODO: finish this
         return result;
     }
@@ -485,6 +485,20 @@ public:
     template <typename U, typename... Ts>
     auto concat(U arg0, Ts... args) {
         return concat(arg0).concat(args...);
+    }
+
+    /*
+     * bits unpacking
+     */
+    template <typename... Ts>
+    [[maybe_unused]] auto unpack(Ts &...args) const {
+        if constexpr (big_endian) {
+            auto tuples = std::forward_as_tuple(args...);
+            auto reversed = util::reverse_tuple(tuples);
+            std::apply([this](auto &&...args) { this->template unpack_(args...); }, reversed);
+        } else {
+            return this->template unpack_(args...);
+        }
     }
 
     /*
@@ -541,16 +555,33 @@ public:
         }
         // for big number it's already set to 0
     }
+
+private:
+    /*
+     * unpacking, which is basically slicing as syntax sugars
+     */
+    template <uint64_t base, uint64_t arg0_size, bool arg0_signed>
+    requires(base < size) void unpack_(bits<arg0_size, arg0_signed, big_endian> &target) const {
+        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
+        target.value = this->template slice<base, upper_bound>();
+    }
+
+    template <uint64_t base = 0, uint64_t arg0_size, bool arg0_signed, typename... Ts>
+    [[maybe_unused]] auto unpack_(bits<arg0_size, arg0_signed, big_endian> &bit0,
+                                  Ts &...args) const {
+        this->template unpack_<base, arg0_size>(bit0);
+        this->template unpack_<base + arg0_size>(args...);
+    }
 };
 
 template <uint64_t size, bool signed_, bool big_endian>
 struct logic {
     using T = typename util::get_holder_type<size, signed_>::type;
-    bits<size> value;
+    bits<size, signed_, big_endian> value;
     // To reduce memory footprint, we use the following encoding scheme
     // if xz_mask is off, value is the actual integer value
     // if xz_mask is on, 0 in value means x and 1 means z
-    bits<size> xz_mask;
+    bits<size, false, big_endian> xz_mask;
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -672,11 +703,11 @@ struct logic {
         size) constexpr logic<util::abs_diff(a, b) + 1, false, big_endian> inline slice() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access
-            return logic<util::abs_diff(a, b) + 1, false>(0);
+            return logic<util::abs_diff(a, b) + 1, false, big_endian>(0);
         }
 
         constexpr auto result_size = util::abs_diff(a, b) + 1u;
-        logic<result_size, false> result;
+        logic<result_size, false, big_endian> result;
         result.value = value.template slice<a, b>();
         // copy over masks
         result.xz_mask = xz_mask.template slice<a, b>();
@@ -690,7 +721,7 @@ struct logic {
     template <uint64_t arg0_size>
     constexpr logic<size + arg0_size, false, big_endian> concat(const logic<arg0_size> &arg0) {
         auto constexpr final_size = size + arg0_size;
-        auto res = logic<final_size>();
+        auto res = logic<final_size, false, big_endian>();
         res.value = value.concat(arg0.value);
         // concat masks as well
         res.xz_mask = xz_mask.concat(arg0.xz_mask);
