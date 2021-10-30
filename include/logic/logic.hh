@@ -454,9 +454,7 @@ public:
     requires(new_size > size && !util::native_num(new_size) &&
              !native_num) bits<new_size, signed_, big_endian> extend()
     const {
-        bits<new_size, signed_, big_endian> result;
-        // TODO: finish this
-        return result;
+        return value.template extend<new_size>();
     }
 
     /*
