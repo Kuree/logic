@@ -220,3 +220,35 @@ TEST(logic, or_) {  // NOLINT
         EXPECT_EQ("x", c.str());
     }
 }
+
+TEST(logic, xor_) {  // NOLINT
+    {
+        logic::logic<1> a{"0"}, b{"1"};
+        auto c = a ^ b;
+        EXPECT_EQ("1", c.str());
+    }
+
+    {
+        logic::logic<1> a{"0"}, b{"0"};
+        auto c = a ^ b;
+        EXPECT_EQ("0", c.str());
+    }
+
+    {
+        logic::logic<1> a{"0"}, b{"x"};
+        auto c = a ^ b;
+        EXPECT_EQ("x", c.str());
+    }
+
+    {
+        logic::logic<1> a{"1"}, b{"x"};
+        auto c = a ^ b;
+        EXPECT_EQ("x", c.str());
+    }
+
+    {
+        logic::logic<1> a{"z"}, b{"x"};
+        auto c = a ^ b;
+        EXPECT_EQ("x", c.str());
+    }
+}

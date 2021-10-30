@@ -946,6 +946,42 @@ struct logic {
         return result;
     }
 
+    logic<size, signed_, big_endian> operator|=(const logic<size, signed_, big_endian> &op) {
+        auto const res = (*this) | op;
+        this->value = res.value;
+        this->xz_mask = res.xz_mask;
+        return *this;
+    }
+
+    logic<size, signed_, big_endian> operator^(const logic<size, signed_, big_endian> &op) const {
+        // this is the truth table
+        //   0 1 x z
+        // 0 1 0 x x
+        // 1 0 1 x x
+        // x x x x x
+        // z x x x x
+        logic<size, signed_, big_endian> result;
+        result.value = value ^ op.value;
+        result.xz_mask = xz_mask | op.xz_mask;
+        // we have taken care of the only top left case
+        // i.e.
+        // 1 0 x z
+        // 0 0 z x
+        // x z x z
+        // z x z x
+        // notice that for the rest of the empty cells, xz_mask is set properly
+        // we use that to create a msk of change everything into x
+        result.value &= ~result.xz_mask;
+        return result;
+    }
+
+    logic<size, signed_, big_endian> operator^=(const logic<size, signed_, big_endian> &op) {
+        auto const res = (*this) ^ op;
+        this->value = res.value;
+        this->xz_mask = res.xz_mask;
+        return *this;
+    }
+
     /*
      * constructors
      */
