@@ -126,3 +126,23 @@ TEST(logic, unpack) {   // NOLINT
         EXPECT_EQ("0011", c.str());
     }
 }
+
+TEST(logic, bool_) {    // NOLINT
+    {
+        logic::logic<4> a{"010x"};
+        if (a) {
+            FAIL();
+        }
+        bool b = static_cast<bool>(a);
+        EXPECT_FALSE(b);
+    }
+
+    {
+        logic::logic<4> a{"0100"};
+        if (!a) {
+            FAIL();
+        }
+        bool b = static_cast<bool>(a);
+        EXPECT_TRUE(b);
+    }
+}

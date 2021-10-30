@@ -242,6 +242,11 @@ public:
     }
 
     /*
+     * boolean operators
+     */
+    explicit operator bool() const { return has_set(); }
+
+    /*
      * mask related stuff
      */
     [[nodiscard]] bool has_set() const {
@@ -453,9 +458,7 @@ public:
     template <uint64_t new_size>
     requires(new_size > size && !util::native_num(new_size) &&
              !native_num) bits<new_size, signed_, big_endian> extend()
-    const {
-        return value.template extend<new_size>();
-    }
+    const { return value.template extend<new_size>(); }
 
     /*
      * concatenation
@@ -498,6 +501,11 @@ public:
             return this->template unpack_(args...);
         }
     }
+
+    /*
+     * boolean operators
+     */
+    explicit operator bool() const { return any_set(); }
 
     /*
      * mask related stuff
@@ -746,6 +754,14 @@ struct logic {
     }
 
     /*
+     * boolean operators
+     */
+    explicit operator bool() const {
+        // if there is any x or z
+        return (!xz_mask.any_set()) && value.any_set();
+    }
+
+    /*
      * constructors
      */
     // by default everything is x
@@ -758,7 +774,7 @@ struct logic {
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
         : value(bits<size>(value)) {}
 
-    constexpr explicit logic(const char *str) : logic(std::string_view(str)) {}
+    explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit logic(std::string_view v) : value(bits<size>(v)) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
