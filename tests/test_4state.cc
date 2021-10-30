@@ -2,6 +2,14 @@
 #include "gtest/gtest.h"
 #include <sstream>
 
+TEST(logic, size) { // NOLINT
+    EXPECT_EQ(sizeof(logic::logic<4>), 1 * 2);
+    EXPECT_EQ(sizeof(logic::logic<8>), 1 * 2);
+    EXPECT_EQ(sizeof(logic::logic<64>), 8 * 2);
+    EXPECT_EQ(sizeof(logic::logic<100>), 16 * 2);
+    EXPECT_EQ(sizeof(logic::logic<128>), 16 * 2);
+}
+
 TEST(logic, init) { // NOLINT
     {
         // uin8_t holder
