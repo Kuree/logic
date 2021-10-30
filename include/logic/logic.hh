@@ -46,6 +46,16 @@ constexpr uint64_t abs_diff(uint64_t a, uint64_t b) { return (a > b) ? (a - b) :
 
 constexpr bool native_num(uint64_t size) { return size <= big_num_threshold; }
 
+template <typename T_R, typename T = std::remove_reference_t<T_R>, auto N = std::tuple_size_v<T>>
+constexpr auto reverse_tuple(T_R &&t) {
+    return [&t]<auto... I>(std::index_sequence<I...>) {
+        constexpr std::array is{(N - 1 - I)...};
+        return std::tuple<std::tuple_element_t<is[I], T>...>{
+            std::get<is[I]>(std::forward<T_R>(t))...};
+    }
+    (std::make_index_sequence<N>{});
+}
+
 template <uint64_t s, bool signed_, typename enable = void>
 struct get_holder_type;
 
@@ -680,22 +690,20 @@ struct logic {
      * unpacking, which is basically slicing as syntax sugars
      */
     template <uint64_t base, uint64_t arg0_size>
-    requires(base < size) void unpack(logic<arg0_size> &target) const {
+    requires(base < size) void unpack_(logic<arg0_size> &target) const {
         // TODO: implement endianness
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         target.value = value.template slice<base, upper_bound>();
         target.xz_mask = xz_mask.template slice<base, upper_bound>();
     }
 
-    template <uint64_t base = size, uint64_t arg0_size, typename... Ts>
-    auto unpack(logic<arg0_size> &logic0, Ts &...args) const {
-        constexpr auto total_size = this->template total_size_(logic0, args...);
-        constexpr auto base_size = total_size - arg0_size;
-        if constexpr (base_size < base) {
-            this->template unpack<base_size, arg0_size>(logic0);
-        }
-
-        this->template unpack<total_size - arg0_size>(args...);
+    template <typename... Ts>
+    auto unpack(Ts &...args) const {
+        auto tuples = std::forward_as_tuple(args...);
+        auto reversed = util::reverse_tuple(tuples);
+        std::apply([this](auto &&... args) {
+            this->template unpack_(args...);
+        }, reversed);
     }
 
     /*
@@ -742,13 +750,10 @@ private:
         xz_mask.template set<idx, false>();
     }
 
-    /*
-     * Not used for now, but once we add endianness, we need to add that
-     */
     template <uint64_t base = 0, uint64_t arg0_size, typename... Ts>
-    [[maybe_unused]] auto unpack_(logic<arg0_size> &logic0, Ts &...args) {
-        this->template unpack<base, arg0_size>(logic0);
-        this->template unpack<base + arg0_size>(args...);
+    [[maybe_unused]] auto unpack_(logic<arg0_size> &logic0, Ts &...args) const {
+        this->template unpack_<base, arg0_size>(logic0);
+        this->template unpack_<base + arg0_size>(args...);
     }
 
     template <uint64_t arg_size>

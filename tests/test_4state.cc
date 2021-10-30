@@ -121,5 +121,8 @@ TEST(logic, unpack) {   // NOLINT
         logic::logic<4> a, b, c;
         auto d = logic::logic<12>("000100100011");
         d.unpack(a, b, c);
+        EXPECT_EQ("0001", a.str());
+        EXPECT_EQ("0010", b.str());
+        EXPECT_EQ("0011", c.str());
     }
 }
