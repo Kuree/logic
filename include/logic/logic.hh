@@ -13,7 +13,7 @@
 
 namespace logic {
 
-template <uint64_t size, bool signed_ = false>
+template <uint64_t size, bool signed_ = false, bool big_endian = true>
 struct big_num;
 
 // some constants
@@ -117,7 +117,7 @@ struct get_holder_type<s, signed_, typename std::enable_if<gte(s, 65)>::type> {
 
 using big_num_holder_type = uint64_t;
 
-template <uint64_t size, bool signed_>
+template <uint64_t size, bool signed_, bool big_endian>
 struct big_num {
 public:
     constexpr static auto s =
@@ -188,7 +188,7 @@ public:
             return bits<util::abs_diff(a, b) + 1, false>(0);
         }
 
-        big_num<util::abs_diff(a, b) + 1> res;
+        big_num<util::abs_diff(a, b) + 1, false, big_endian> res;
         constexpr auto max = util::max(a, b);
         constexpr auto min = util::min(a, b);
         for (uint64_t i = min; i <= max; i++) {
@@ -201,7 +201,7 @@ public:
     template <uint64_t new_size>
     requires(new_size > size) big_num<new_size, signed_> extend()
     const {
-        big_num<new_size, signed_> result;
+        big_num<new_size, signed_, big_endian> result;
         util::copy(result.values, values, 0, s);
         // based on the sign, need to fill out leading ones
         if constexpr (signed_) {
@@ -211,19 +211,31 @@ public:
         }
     }
 
-    template <uint64_t ss>
-    auto concat(const big_num<ss> &num) const {
+    // doesn't matter about the sign, but endianness must match
+    template <uint64_t ss, bool num_signed>
+    auto concat(const big_num<ss, num_signed, big_endian> &num) const {
         auto constexpr final_size = size + ss;
-        big_num<final_size> result;
-        // copy over the num one since it's on the LSB
-        // TODO: refactor code to support big/little endianness
-        for (auto i = 0u; i < num.s; i++) {
-            result.values[i] = num.values[i];
-        }
-        // then copy over the current on
-        for (auto i = ss; i < final_size; i++) {
-            auto idx = i - ss;
-            result.set(i, get(idx));
+        big_num<final_size, false, big_endian> result;
+        if constexpr (big_endian) {
+            // copy over the num one since it's on the LSB
+            for (auto i = 0u; i < num.s; i++) {
+                result.values[i] = num.values[i];
+            }
+            // then copy over the current on
+            for (auto i = ss; i < final_size; i++) {
+                auto idx = i - ss;
+                result.set(i, get(idx));
+            }
+        } else {
+            // little endian
+            for (auto i = 0u; i < s; i++) {
+                result.values[i] = values[i];
+            }
+            // copy over the new one
+            for (auto i = size; i < final_size; i++) {
+                auto idx = i - size;
+                result.set(i, get(idx));
+            }
         }
 
         return result;
@@ -273,10 +285,10 @@ public:
     big_num() { std::fill(values.begin(), values.end(), 0); }
 };
 
-template <uint64_t size, bool signed_ = false>
+template <uint64_t size, bool signed_ = false, bool big_endian = true>
 struct logic;
 
-template <uint64_t size, bool signed_ = false>
+template <uint64_t size, bool signed_ = false, bool big_endian = true>
 struct bits {
 private:
 public:
@@ -364,7 +376,7 @@ public:
         constexpr auto max = util::max(a, b);
         constexpr auto min = util::min(a, b);
         constexpr auto t_size = sizeof(T) * 8;
-        bits<util::abs_diff(a, b) + 1, false> result;
+        bits<util::abs_diff(a, b) + 1, false, big_endian> result;
         constexpr auto default_mask = std::numeric_limits<T>::max();
         uint64_t mask = default_mask << min;
         mask &= (default_mask >> (t_size - max));
@@ -381,7 +393,7 @@ public:
         util::max(a, b) < size && !native_num &&
         util::native_num(util::abs_diff(a, b) +
                          1)) constexpr bits<util::abs_diff(a, b) + 1, false> inline slice() const {
-        bits<util::abs_diff(a, b) + 1, false> result;
+        bits<util::abs_diff(a, b) + 1, false, big_endian> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
         result.value = res.values[0];
@@ -396,7 +408,7 @@ public:
         util::max(a, b) < size && !native_num &&
         !util::native_num(util::abs_diff(a, b) +
                           1)) constexpr bits<util::abs_diff(a, b) + 1, false> inline slice() const {
-        bits<util::abs_diff(a, b) + 1, false> result;
+        bits<util::abs_diff(a, b) + 1, false, big_endian> result;
         result.value = value.template slice<a, b>();
         return result;
     }
@@ -405,22 +417,24 @@ public:
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
     template <uint64_t new_size>
-    requires(new_size > size && util::native_num(new_size)) bits<new_size> extend()
-    const { return bits<new_size>(value); }
+    requires(new_size > size &&
+             util::native_num(new_size)) bits<new_size, signed_, big_endian> extend()
+    const { return bits<new_size, signed_, big_endian>(value); }
 
     // same size, just use the default copy constructor
     template <uint64_t new_size>
-    requires(new_size == size) bits<new_size> extend()
+    requires(new_size == size) bits<new_size, signed_, big_endian> extend()
     const { return *this; }
 
     // new size is smaller. this is just a slice
     template <uint64_t new_size>
-    requires(new_size < size) bits<new_size> extend()
+    requires(new_size < size) bits<new_size, signed_, big_endian> extend()
     const { return slice<new_size - 1, 0>(); }
 
     // native number, but extend to a big number
     template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) && native_num) bits<new_size> extend()
+    requires(new_size > size && !util::native_num(new_size) &&
+             native_num) bits<new_size, signed_, big_endian> extend()
     const {
         bits<new_size> result;
         // use C++ default semantics to cast
@@ -437,10 +451,11 @@ public:
 
     // big number and gets extended to a big number
     template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) && !native_num) bits<new_size> extend()
+    requires(new_size > size && !util::native_num(new_size) &&
+             !native_num) bits<new_size, signed_, big_endian> extend()
     const {
         bits<new_size> result;
-
+        // TODO: finish this
         return result;
     }
 
@@ -448,15 +463,15 @@ public:
      * concatenation
      */
     template <uint64_t arg0_size>
-    bits<size + arg0_size> concat(const bits<arg0_size> &arg0) {
+    bits<size + arg0_size, false, big_endian> concat(const bits<arg0_size> &arg0) {
         auto constexpr final_size = size + arg0_size;
-        if constexpr (native_num) {
-            return bits<final_size>(value << arg0_size | arg0.value);
+        if constexpr (final_size < big_num_threshold) {
+            return bits<final_size, false, big_endian>(value << arg0_size | arg0.value);
         } else {
             auto res = bits<final_size>();
             if constexpr (arg0.native_num) {
                 // convert to big num
-                big_num<arg0_size> b(arg0.value);
+                big_num<arg0_size, false, big_endian> b(arg0.value);
                 auto big_num = value.concat(b);
                 res.big_num = big_num;
             } else {
@@ -528,7 +543,7 @@ public:
     }
 };
 
-template <uint64_t size, bool signed_>
+template <uint64_t size, bool signed_, bool big_endian>
 struct logic {
     using T = typename util::get_holder_type<size, signed_>::type;
     bits<size> value;
@@ -652,8 +667,9 @@ struct logic {
      * slices
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) <
-             size) constexpr logic<util::abs_diff(a, b) + 1, false> inline slice() const {
+    requires(
+        util::max(a, b) <
+        size) constexpr logic<util::abs_diff(a, b) + 1, false, big_endian> inline slice() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access
             return logic<util::abs_diff(a, b) + 1, false>(0);
@@ -672,7 +688,7 @@ struct logic {
      * concatenation
      */
     template <uint64_t arg0_size>
-    constexpr logic<size + arg0_size> concat(const logic<arg0_size> &arg0) {
+    constexpr logic<size + arg0_size, false, big_endian> concat(const logic<arg0_size> &arg0) {
         auto constexpr final_size = size + arg0_size;
         auto res = logic<final_size>();
         res.value = value.concat(arg0.value);
@@ -687,23 +703,17 @@ struct logic {
     }
 
     /*
-     * unpacking, which is basically slicing as syntax sugars
+     * bits unpacking
      */
-    template <uint64_t base, uint64_t arg0_size>
-    requires(base < size) void unpack_(logic<arg0_size> &target) const {
-        // TODO: implement endianness
-        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
-        target.value = value.template slice<base, upper_bound>();
-        target.xz_mask = xz_mask.template slice<base, upper_bound>();
-    }
-
     template <typename... Ts>
     auto unpack(Ts &...args) const {
-        auto tuples = std::forward_as_tuple(args...);
-        auto reversed = util::reverse_tuple(tuples);
-        std::apply([this](auto &&... args) {
-            this->template unpack_(args...);
-        }, reversed);
+        if constexpr (big_endian) {
+            auto tuples = std::forward_as_tuple(args...);
+            auto reversed = util::reverse_tuple(tuples);
+            std::apply([this](auto &&...args) { this->template unpack_(args...); }, reversed);
+        } else {
+            return this->template unpack_(args...);
+        }
     }
 
     /*
@@ -750,19 +760,21 @@ private:
         xz_mask.template set<idx, false>();
     }
 
-    template <uint64_t base = 0, uint64_t arg0_size, typename... Ts>
-    [[maybe_unused]] auto unpack_(logic<arg0_size> &logic0, Ts &...args) const {
-        this->template unpack_<base, arg0_size>(logic0);
-        this->template unpack_<base + arg0_size>(args...);
+    /*
+     * unpacking, which is basically slicing as syntax sugars
+     */
+    template <uint64_t base, uint64_t arg0_size, bool arg0_signed>
+    requires(base < size) void unpack_(logic<arg0_size, arg0_signed, big_endian> &target) const {
+        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
+        target.value = value.template slice<base, upper_bound>();
+        target.xz_mask = xz_mask.template slice<base, upper_bound>();
     }
 
-    template <uint64_t arg_size>
-    constexpr static uint64_t total_size_(const logic<arg_size> &logic) {
-        return arg_size;
-    }
-    template <uint64_t arg_size, typename... Ts>
-    constexpr static uint64_t total_size_(const logic<arg_size> &logic, const Ts &...args) {
-        return arg_size + total_size_(args...);
+    template <uint64_t base = 0, uint64_t arg0_size, bool arg0_signed, typename... Ts>
+    [[maybe_unused]] auto unpack_(logic<arg0_size, arg0_signed, big_endian> &logic0,
+                                  Ts &...args) const {
+        this->template unpack_<base, arg0_size>(logic0);
+        this->template unpack_<base + arg0_size>(args...);
     }
 };
 
