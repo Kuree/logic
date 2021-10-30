@@ -145,4 +145,46 @@ TEST(logic, bool_) {    // NOLINT
         bool b = static_cast<bool>(a);
         EXPECT_TRUE(b);
     }
+
+    {
+        logic::logic<4> a{"0100"};
+        logic::logic<4> b{"010z"};
+        if (a && b) {
+            FAIL();
+        }
+        bool c = static_cast<bool>(a && b);
+        EXPECT_FALSE(c);
+    }
+}
+
+TEST(logic, and_) { // NOLINT
+    {
+        logic::logic<1> a{"0"}, b{"1"};
+        auto c = a & b;
+        EXPECT_EQ("0", c.str());
+    }
+
+    {
+        logic::logic<1> a{"0"}, b{"x"};
+        auto c = a & b;
+        EXPECT_EQ("0", c.str());
+    }
+
+    {
+        logic::logic<1> a{"z"}, b{"x"};
+        auto c = a & b;
+        EXPECT_EQ("x", c.str());
+    }
+
+    {
+        logic::logic<1> a{"1"}, b{"x"};
+        auto c = a & b;
+        EXPECT_EQ("x", c.str());
+    }
+
+    {
+        logic::logic<1> a{"1"}, b{"z"};
+        auto c = a & b;
+        EXPECT_EQ("x", c.str());
+    }
 }

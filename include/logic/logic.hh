@@ -247,6 +247,72 @@ public:
     explicit operator bool() const { return has_set(); }
 
     /*
+     * bitwise operators
+     */
+    big_num<size, signed_, big_endian> operator~() const {
+        big_num<size, signed_, big_endian> result;
+        for (uint i = 0; i < s; i++) {
+            result.values[i] = ~values[i];
+        }
+        // mask off the top bits, if any
+        for (auto i = size; i < s * big_num_threshold; i++) {
+            set(i, false);
+        }
+        return result;
+    }
+
+    big_num<size, signed_, big_endian> operator&(
+        const big_num<size, signed_, big_endian> &op) const {
+        big_num<size, signed_, big_endian> result;
+        for (uint i = 0; i < s; i++) {
+            result.values[i] = values[i] & op.values[i];
+        }
+        return result;
+    }
+
+    big_num<size, signed_, big_endian> &operator&=(
+        const big_num<size, signed_, big_endian> &op) const {
+        for (uint i = 0; i < s; i++) {
+            values[i] &= op.values[i];
+        }
+        return *this;
+    }
+
+    big_num<size, signed_, big_endian> operator^(
+        const big_num<size, signed_, big_endian> &op) const {
+        big_num<size, signed_, big_endian> result;
+        for (uint i = 0; i < s; i++) {
+            result.values[i] = values[i] ^ op.values[i];
+        }
+        return result;
+    }
+
+    big_num<size, signed_, big_endian> &operator^=(
+        const big_num<size, signed_, big_endian> &op) const {
+        for (uint i = 0; i < s; i++) {
+            values[i] ^= op.values[i];
+        }
+        return *this;
+    }
+
+    big_num<size, signed_, big_endian> operator|(
+        const big_num<size, signed_, big_endian> &op) const {
+        big_num<size, signed_, big_endian> result;
+        for (uint i = 0; i < s; i++) {
+            result.values[i] = values[i] | op.values[i];
+        }
+        return result;
+    }
+
+    big_num<size, signed_, big_endian> &operator|=(
+        const big_num<size, signed_, big_endian> &op) const {
+        for (uint i = 0; i < s; i++) {
+            values[i] |= op.values[i];
+        }
+        return *this;
+    }
+
+    /*
      * mask related stuff
      */
     [[nodiscard]] bool has_set() const {
@@ -508,6 +574,55 @@ public:
     explicit operator bool() const { return any_set(); }
 
     /*
+     * bitwise operators
+     */
+    bits<size, signed_, big_endian> operator~() const {
+        bits<size, signed_, big_endian> result;
+        if constexpr (size == 1) {
+            result.value = !value;
+        } else {
+            result.value = ~value;
+        }
+        return result;
+    }
+
+    bits<size, signed_, big_endian> operator&(const bits<size, signed_, big_endian> &op) const {
+        bits<size, signed_, big_endian> result;
+        result.value = value & op.value;
+        return result;
+    }
+
+    bits<size, signed_, big_endian> &operator&=(const bits<size, signed_, big_endian> &op) {
+        bits<size, signed_, big_endian> result;
+        value &= op.value;
+        return *this;
+    }
+
+    bits<size, signed_, big_endian> operator^(const bits<size, signed_, big_endian> &op) const {
+        bits<size, signed_, big_endian> result;
+        result.value = value ^ op.value;
+        return result;
+    }
+
+    bits<size, signed_, big_endian> &operator^=(const bits<size, signed_, big_endian> &op) {
+        bits<size, signed_, big_endian> result;
+        value ^= op.value;
+        return *this;
+    }
+
+    bits<size, signed_, big_endian> operator|(const bits<size, signed_, big_endian> &op) const {
+        bits<size, signed_, big_endian> result;
+        result.value = value | op.value;
+        return result;
+    }
+
+    bits<size, signed_, big_endian> &operator|=(const bits<size, signed_, big_endian> &op) {
+        bits<size, signed_, big_endian> result;
+        value |= op.value;
+        return *this;
+    }
+
+    /*
      * mask related stuff
      */
     [[nodiscard]] bool any_set() const requires(native_num) {
@@ -759,6 +874,36 @@ struct logic {
     explicit operator bool() const {
         // if there is any x or z
         return (!xz_mask.any_set()) && value.any_set();
+    }
+
+    /*
+     * bitwise operators
+     */
+    logic<size, signed_, big_endian> operator&(const logic<size, signed_, big_endian> &op) const {
+        // this is the truth table
+        //   0 1 x z
+        // 0 0 0 0 0
+        // 1 0 1 x x
+        // x 0 x x x
+        // z 0 x x x
+        logic<size, signed_, big_endian> result;
+        result.value = value & op.value;
+        result.xz_mask = xz_mask & op.xz_mask;
+        // we have taken care for the top left and bottom case
+        // i.e.
+        // 0 0 0 0
+        // 0 1
+        // 0   x x
+        // 0   x x
+        // need to take care of the rest
+        // only happens between 1 and x/z. Notice that 1 is encoded as (1, 0) and x is (, 1)
+        //
+        auto mask = (((xz_mask ^ op.xz_mask) & ~xz_mask) & value) |     // 1   & x/z
+                    (((op.xz_mask ^ xz_mask) & ~op.xz_mask) & ~value);  // x/z & 1
+        result.xz_mask |= mask;
+        result.value &= ~mask;
+
+        return result;
     }
 
     /*
