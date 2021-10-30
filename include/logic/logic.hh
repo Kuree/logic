@@ -7,6 +7,7 @@
 #include <numeric>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -348,7 +349,7 @@ public:
      */
     template <uint64_t a, uint64_t b>
     requires(util::max(a, b) < size && native_num) bits<util::abs_diff(a, b) + 1, false>
-    inline slice() const {
+    constexpr inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto max = util::max(a, b);
         constexpr auto min = util::min(a, b);
@@ -366,9 +367,10 @@ public:
      * big number but small slice
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size && !native_num &&
-             util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
-    inline slice() const {
+    requires(
+        util::max(a, b) < size && !native_num &&
+        util::native_num(util::abs_diff(a, b) +
+                         1)) constexpr bits<util::abs_diff(a, b) + 1, false> inline slice() const {
         bits<util::abs_diff(a, b) + 1, false> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
@@ -380,9 +382,10 @@ public:
      * big number and big slice
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size && !native_num &&
-             !util::native_num(util::abs_diff(a, b) + 1)) bits<util::abs_diff(a, b) + 1, false>
-    inline slice() const {
+    requires(
+        util::max(a, b) < size && !native_num &&
+        !util::native_num(util::abs_diff(a, b) +
+                          1)) constexpr bits<util::abs_diff(a, b) + 1, false> inline slice() const {
         bits<util::abs_diff(a, b) + 1, false> result;
         result.value = value.template slice<a, b>();
         return result;
@@ -639,8 +642,8 @@ struct logic {
      * slices
      */
     template <uint64_t a, uint64_t b>
-    requires(util::max(a, b) < size) logic<util::abs_diff(a, b) + 1, false>
-    inline slice() const {
+    requires(util::max(a, b) <
+             size) constexpr logic<util::abs_diff(a, b) + 1, false> inline slice() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access
             return logic<util::abs_diff(a, b) + 1, false>(0);
@@ -659,7 +662,7 @@ struct logic {
      * concatenation
      */
     template <uint64_t arg0_size>
-    logic<size + arg0_size> concat(const logic<arg0_size> &arg0) {
+    constexpr logic<size + arg0_size> concat(const logic<arg0_size> &arg0) {
         auto constexpr final_size = size + arg0_size;
         auto res = logic<final_size>();
         res.value = value.concat(arg0.value);
@@ -669,32 +672,37 @@ struct logic {
     }
 
     template <typename U, typename... Ts>
-    auto concat(U arg0, Ts... args) {
+    constexpr auto concat(U arg0, Ts... args) {
         return concat(arg0).concat(args...);
     }
 
     /*
      * unpacking, which is basically slicing as syntax sugars
      */
-    template <uint64_t base, uint64_t arg0_size> requires (base < size)
-    void unpack(logic<arg0_size> &target) {
+    template <uint64_t base, uint64_t arg0_size>
+    requires(base < size) void unpack(logic<arg0_size> &target) const {
         // TODO: implement endianness
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         target.value = value.template slice<base, upper_bound>();
         target.xz_mask = xz_mask.template slice<base, upper_bound>();
     }
 
-    template <uint64_t base=0, uint64_t arg0_size, typename... Ts>
-    auto unpack(logic<arg0_size> &logic0, Ts&... args) {
-        this->template unpack<base, arg0_size>(logic0);
-        this->template unpack<base + arg0_size>(args...);
+    template <uint64_t base = size, uint64_t arg0_size, typename... Ts>
+    auto unpack(logic<arg0_size> &logic0, Ts &...args) const {
+        constexpr auto total_size = this->template total_size_(logic0, args...);
+        constexpr auto base_size = total_size - arg0_size;
+        if constexpr (base_size < base) {
+            this->template unpack<base_size, arg0_size>(logic0);
+        }
+
+        this->template unpack<total_size - arg0_size>(args...);
     }
 
     /*
      * constructors
      */
     // by default everything is x
-    logic() { xz_mask.mask(); }
+    constexpr logic() { xz_mask.mask(); }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
         : value(bits<size>(value)) {}
@@ -732,6 +740,24 @@ private:
     template <uint64_t idx>
     void unmask_bit() {
         xz_mask.template set<idx, false>();
+    }
+
+    /*
+     * Not used for now, but once we add endianness, we need to add that
+     */
+    template <uint64_t base = 0, uint64_t arg0_size, typename... Ts>
+    [[maybe_unused]] auto unpack_(logic<arg0_size> &logic0, Ts &...args) {
+        this->template unpack<base, arg0_size>(logic0);
+        this->template unpack<base + arg0_size>(args...);
+    }
+
+    template <uint64_t arg_size>
+    constexpr static uint64_t total_size_(const logic<arg_size> &logic) {
+        return arg_size;
+    }
+    template <uint64_t arg_size, typename... Ts>
+    constexpr static uint64_t total_size_(const logic<arg_size> &logic, const Ts &...args) {
+        return arg_size + total_size_(args...);
     }
 };
 
