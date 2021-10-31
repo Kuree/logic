@@ -345,6 +345,8 @@ public:
     big_num<size, signed_, big_endian> operator>>(uint64_t amount) const {
         // we will implement logic shifts regardless of the sign
         big_num<size, signed_, big_endian> res;
+        if (amount > size) [[unlikely]]
+            return res;
         for (uint64_t i = amount; i < size; i++) {
             auto dst = i - amount;
             res.set(dst, get(i));
@@ -369,7 +371,9 @@ public:
     big_num<size, signed_, big_endian> operator<<(uint64_t amount) const {
         // we will implement logic shifts regardless of the sign
         big_num<size, signed_, big_endian> res;
-        for (uint64_t i = 0; i < size - amount; i++) {
+        if (amount > size) [[unlikely]]
+            return res;
+        for (uint64_t i = 0u; i < (size - amount); i++) {
             auto dst = i + amount;
             res.set(dst, get(i));
         }
@@ -383,7 +387,7 @@ public:
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
         // the result has to be zero
-        for (auto i = 1; i < amount.s; i++) {
+        for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) return big_num<size, signed_, big_endian>{};
         }
         // now we reduce the problem to a normal shift amount problem
@@ -432,6 +436,9 @@ public:
 
     // set values to 0 when initialized
     big_num() { std::fill(values.begin(), values.end(), 0); }
+
+private:
+    bool get(uint64_t idx) const { return operator[](idx); }
 };
 
 template <uint64_t size, bool signed_ = false, bool big_endian = true>
@@ -772,7 +779,9 @@ public:
         bits<size, signed_, big_endian> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num, amount.native_num) {
+        // clang doesn't allow accessing native_num as amount.native_num
+        // see https://stackoverflow.com/a/44996066
+        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
             res.value = value << static_cast<T>(amount.value);
         } else if constexpr ((!native_num)) {
             res.value = value << amount.value;
@@ -1278,14 +1287,14 @@ struct logic {
     constexpr logic() { xz_mask.mask(); }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
-        : value(bits<size>(value)) {}
+        : value(bits<size, signed_, big_endian>(value)) {}
 
     template <typename K>
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bits<size>(value)) {}
+        : value(bits<size, signed_, big_endian>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bits<size>(v)) {
+    explicit logic(std::string_view v) : value(bits<size, signed_, big_endian>(v)) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
@@ -1305,7 +1314,7 @@ struct logic {
     }
 
     // conversion from bits to logic
-    constexpr explicit logic(const bits<size, signed_> &b) : value(b) {}
+    constexpr explicit logic(const bits<size, signed_, big_endian> &b) : value(b) {}
 
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
