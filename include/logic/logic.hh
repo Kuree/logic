@@ -742,7 +742,8 @@ public:
         // couple cases
         // 1. both of them are native number
         if constexpr (native_num, amount.native_num) {
-            res.value = value >> static_cast<T>(amount.value);
+            // make sure to mask off any bits dur to signed extension
+            res.value = (value >> static_cast<T>(amount.value)) & value_mask(size - amount.value);
         } else if constexpr ((!native_num)) {
             res.value = value >> amount.value;
         } else {
@@ -865,6 +866,12 @@ private:
                                   Ts &...args) const {
         this->template unpack_<base, arg0_size>(bit0);
         this->template unpack_<base + arg0_size>(args...);
+    }
+
+    T value_mask(uint64_t requested_size) {
+        auto mask = std::numeric_limits<uint64_t>::max();
+        mask = mask >> (64ull - requested_size);
+        return static_cast<T>(mask);
     }
 };
 
