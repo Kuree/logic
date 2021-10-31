@@ -241,7 +241,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] uint64_t popcount() const {
+    [[maybe_unused]] [[nodiscard]] uint64_t popcount() const {
         return std::accumulate(values.begin(), values.end(), std::popcount);
     }
 
@@ -602,6 +602,7 @@ public:
      * boolean operators
      */
     explicit operator bool() const { return any_set(); }
+    bool operator!() const { return !any_set(); }
 
     [[nodiscard]] uint64_t popcount() const {
         if constexpr (native_num) {
@@ -940,6 +941,10 @@ struct logic {
         return (!xz_mask.any_set()) && value.any_set();
     }
 
+    logic<1> operator!() const {
+        return xz_mask.any_set() ? x_() : (value.any_set() ? zero_() : one_());
+    }
+
     /*
      * bitwise operators
      */
@@ -1063,9 +1068,9 @@ struct logic {
         // zero trump everything
         // brute force way to compute
         for (auto i = 0u; i < size; i++) {
-            auto b = value.get(i);
-            auto m = xz_mask.get(i);
-            if (!b && m)
+            auto b = value[i];
+            auto m = xz_mask[i];
+            if (!b && !m)
                 return zero_();
             else if (m)
                 return x_();
@@ -1077,8 +1082,8 @@ struct logic {
 
     [[nodiscard]] logic<1> r_or() const {
         for (auto i = 0u; i < size; i++) {
-            auto b = value.get(i);
-            auto m = xz_mask.get(i);
+            auto b = value[i];
+            auto m = xz_mask[i];
             if (b && !m)
                 return one_();
             else if (m)
@@ -1166,21 +1171,21 @@ private:
         this->template unpack_<base + arg0_size>(args...);
     }
 
-    constexpr logic<1> x_() {
+    static constexpr logic<1> x_() {
         logic<1> r;
         r.value.value = false;
         r.xz_mask.value = true;
         return r;
     }
 
-    constexpr logic<1> one_() {
+    static constexpr logic<1> one_() {
         logic<1> r;
         r.value.value = true;
         r.xz_mask.value = false;
         return r;
     }
 
-    constexpr logic<1> zero_() {
+    static constexpr logic<1> zero_() {
         logic<1> r;
         r.value.value = false;
         r.xz_mask.value = false;

@@ -287,3 +287,55 @@ TEST(logic, not_) {  // NOLINT
     }
 
 }
+
+TEST(logic, r_and) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_and();
+        EXPECT_EQ("0", b.str());
+    }
+
+    {
+        logic::logic<4> a{"1111"};
+        auto b = a.r_and();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x111"};
+        auto b = a.r_and();
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<4> a{"xz11"};
+        auto b = a.r_and();
+        EXPECT_EQ("x", b.str());
+    }
+}
+
+TEST(logic, r_nand) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_nand();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x001"};
+        auto b = a.r_nand();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"z001"};
+        auto b = a.r_nand();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"xz11"};
+        auto b = a.r_nand();
+        EXPECT_EQ("x", b.str());
+    }
+}
