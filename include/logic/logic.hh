@@ -241,10 +241,14 @@ public:
         return result;
     }
 
+    [[nodiscard]] uint64_t popcount() const {
+        return std::accumulate(values.begin(), values.end(), std::popcount);
+    }
+
     /*
      * boolean operators
      */
-    explicit operator bool() const { return has_set(); }
+    explicit operator bool() const { return any_set(); }
 
     /*
      * bitwise operators
@@ -312,10 +316,36 @@ public:
         return *this;
     }
 
+    // reduction
+    [[maybe_unused]] [[nodiscard]] bool r_and() const {
+        // only if all the bits are set
+        auto b = std::all_of(values.begin(), values.begin() + s - 1, [](auto const v) {
+            return v == std::numeric_limits<uint64_t>::max();
+        });
+        if constexpr (values.size() * 8 == size) {
+            return b;
+        } else {
+            if (b) return false;
+
+            for (uint64_t i = (values.size() - 1); i < s; i++) {
+                if (!get(i)) return false;
+            }
+        }
+        return true;
+    }
+
+    [[maybe_unused]] [[nodiscard]] bool r_xor() const {
+        bool b = get<0>();
+        for (auto i = 1u; i < size; i++) {
+            b = b ^ get(i);
+        }
+        return b;
+    }
+
     /*
      * mask related stuff
      */
-    [[nodiscard]] bool has_set() const {
+    [[nodiscard]] bool any_set() const {
         // we use the fact that SIMD instructions are faster than compare and branch
         // so summation is faster than any_of in theory
         // also all unused bits are set to 0 by default
@@ -573,6 +603,14 @@ public:
      */
     explicit operator bool() const { return any_set(); }
 
+    [[nodiscard]] uint64_t popcount() const {
+        if constexpr (native_num) {
+            return std::popcount(value);
+        } else {
+            return value.popcount();
+        }
+    }
+
     /*
      * bitwise operators
      */
@@ -621,6 +659,32 @@ public:
         value |= op.value;
         return *this;
     }
+
+    // reduction
+    [[nodiscard]] bool r_and() const requires(native_num) {
+        auto constexpr max = std::numeric_limits<T>::max() >> (sizeof(T) * 8 - size);
+        return value == max;
+    }
+
+    [[nodiscard]] bool r_and() const requires(!native_num) { return value.r_xor(); }
+
+    [[maybe_unused]] [[nodiscard]] bool r_nand() const { return !r_and(); }
+
+    [[nodiscard]] bool r_or() const { return any_set(); }
+
+    [[maybe_unused]] [[nodiscard]] bool r_nor() const { return !r_or(); }
+
+    [[nodiscard]] bool r_xor() const requires(native_num) {
+        bool b = get<0>();
+        for (auto i = 1; i < size; i++) {
+            b = b ^ get(i);
+        }
+        return b;
+    }
+
+    [[nodiscard]] bool r_xor() const requires(!native_num) { return value.r_xor(); }
+
+    [[maybe_unused]] [[nodiscard]] bool r_xnor() const { return !r_xor(); }
 
     /*
      * mask related stuff
@@ -994,6 +1058,53 @@ struct logic {
         return result;
     }
 
+    // reduction
+    [[nodiscard]] logic<1> r_and() const {
+        // zero trump everything
+        // brute force way to compute
+        for (auto i = 0u; i < size; i++) {
+            auto b = value.get(i);
+            auto m = xz_mask.get(i);
+            if (!b && m)
+                return zero_();
+            else if (m)
+                return x_();
+        }
+        return one_();
+    }
+
+    [[maybe_unused]] [[nodiscard]] logic<1> r_nand() const { return !r_and(); }
+
+    [[nodiscard]] logic<1> r_or() const {
+        for (auto i = 0u; i < size; i++) {
+            auto b = value.get(i);
+            auto m = xz_mask.get(i);
+            if (b && !m)
+                return one_();
+            else if (m)
+                return x_();
+        }
+        return zero_();
+    }
+
+    [[nodiscard]] logic<1> r_nor() const { return !r_or(); }
+
+    [[nodiscard]] logic<1> r_xor() const {
+        // this is the truth table
+        //   0 1 x z
+        // 0 1 0 x x
+        // 1 0 1 x x
+        // x x x x x
+        // z x x x x
+        // if x/z is set, it's always x
+        if (xz_mask.any_set()) return x_();
+        auto bits_count = value.popcount();
+        auto zeros = size - bits_count;
+        return (zeros % 2) ? one_() : zero_();
+    }
+
+    [[nodiscard]] logic<1> r_xnor() const { return !r_xor(); }
+
     /*
      * constructors
      */
@@ -1053,6 +1164,27 @@ private:
                                   Ts &...args) const {
         this->template unpack_<base, arg0_size>(logic0);
         this->template unpack_<base + arg0_size>(args...);
+    }
+
+    constexpr logic<1> x_() {
+        logic<1> r;
+        r.value.value = false;
+        r.xz_mask.value = true;
+        return r;
+    }
+
+    constexpr logic<1> one_() {
+        logic<1> r;
+        r.value.value = true;
+        r.xz_mask.value = false;
+        return r;
+    }
+
+    constexpr logic<1> zero_() {
+        logic<1> r;
+        r.value.value = false;
+        r.xz_mask.value = false;
+        return r;
     }
 };
 
