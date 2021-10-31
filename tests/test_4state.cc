@@ -339,3 +339,83 @@ TEST(logic, r_nand) {    // NOLINT
         EXPECT_EQ("x", b.str());
     }
 }
+
+TEST(logic, r_or) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_or();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"z000"};
+        auto b = a.r_or();
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x000"};
+        auto b = a.r_or();
+        EXPECT_EQ("x", b.str());
+    }
+}
+
+TEST(logic, r_nor) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_nor();
+        EXPECT_EQ("0", b.str());
+    }
+
+    {
+        logic::logic<4> a{"z000"};
+        auto b = a.r_nor();
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x001"};
+        auto b = a.r_nor();
+        EXPECT_EQ("0", b.str());
+    }
+}
+
+TEST(logic, r_xor) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_xor();
+        EXPECT_EQ("0", b.str());
+    }
+
+    {
+        logic::logic<4> a{"z001"};
+        auto b = a.r_xor();
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x001"};
+        auto b = a.r_xor();
+        EXPECT_EQ("x", b.str());
+    }
+}
+
+TEST(logic, r_xnor) {    // NOLINT
+    {
+        logic::logic<4> a{"1001"};
+        auto b = a.r_xnor();
+        EXPECT_EQ("1", b.str());
+    }
+
+    {
+        logic::logic<4> a{"z001"};
+        auto b = a.r_xnor();
+        EXPECT_EQ("x", b.str());
+    }
+
+    {
+        logic::logic<4> a{"x001"};
+        auto b = a.r_xnor();
+        EXPECT_EQ("x", b.str());
+    }
+}
