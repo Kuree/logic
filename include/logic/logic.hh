@@ -342,6 +342,54 @@ public:
         return b;
     }
 
+    big_num<size, signed_, big_endian> operator>>(uint64_t amount) const {
+        // we will implement logic shifts regardless of the sign
+        big_num<size, signed_, big_endian> res;
+        for (uint64_t i = amount; i < size; i++) {
+            auto dst = i - amount;
+            res.set(dst, get(i));
+        }
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    big_num<size, signed_, big_endian> operator>>(
+        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        // we will implement logic shifts regardless of the sign
+        // we utilize the property that, since the max size of the logic is 2^64,
+        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // the result has to be zero
+        for (auto i = 1; i < amount.s; i++) {
+            if (amount.values[i]) return big_num<size, signed_, big_endian>{};
+        }
+        // now we reduce the problem to a normal shift amount problem
+        return *(this) >> amount.values[0];
+    }
+
+    big_num<size, signed_, big_endian> operator<<(uint64_t amount) const {
+        // we will implement logic shifts regardless of the sign
+        big_num<size, signed_, big_endian> res;
+        for (uint64_t i = 0; i < size - amount; i++) {
+            auto dst = i + amount;
+            res.set(dst, get(i));
+        }
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    big_num<size, signed_, big_endian> operator<<(
+        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        // we will implement logic shifts regardless of the sign
+        // we utilize the property that, since the max size of the logic is 2^64,
+        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // the result has to be zero
+        for (auto i = 1; i < amount.s; i++) {
+            if (amount.values[i]) return big_num<size, signed_, big_endian>{};
+        }
+        // now we reduce the problem to a normal shift amount problem
+        return *(this) << amount.values[0];
+    }
+
     /*
      * mask related stuff
      */
@@ -686,6 +734,66 @@ public:
     [[nodiscard]] bool r_xor() const requires(!native_num) { return value.r_xor(); }
 
     [[maybe_unused]] [[nodiscard]] bool r_xnor() const { return !r_xor(); }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> operator>>(
+        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        bits<size, signed_, big_endian> res;
+        // couple cases
+        // 1. both of them are native number
+        if constexpr (native_num, amount.native_num) {
+            res.value = value >> static_cast<T>(amount.value);
+        } else if constexpr ((!native_num)) {
+            res.value = value >> amount.value;
+        } else {
+            // itself is a native number but amount is not
+            // convert to itself as a big number
+            big_num<size, signed_, big_endian> big_num;
+            big_num.values[0] = static_cast<uint64_t>(value);
+            auto res_num = big_num >> amount;
+            res.value = static_cast<T>(res_num.values[0]);
+        }
+
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> &operator>>=(
+        const bits<new_size, new_signed, new_big_endian> &amount) {
+        auto res = (*this) >> amount;
+        value = res.value;
+        return *this;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> operator<<(
+        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        bits<size, signed_, big_endian> res;
+        // couple cases
+        // 1. both of them are native number
+        if constexpr (native_num, amount.native_num) {
+            res.value = value << static_cast<T>(amount.value);
+        } else if constexpr ((!native_num)) {
+            res.value = value << amount.value;
+        } else {
+            // itself is a native number but amount is not
+            // convert to itself as a big number
+            big_num<size, signed_, big_endian> big_num;
+            big_num.values[0] = static_cast<uint64_t>(value);
+            auto res_num = big_num << amount;
+            res.value = static_cast<T>(res_num.values[0]);
+        }
+
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> &operator<<=(
+        const bits<new_size, new_signed, new_big_endian> &amount) {
+        auto res = (*this) << amount;
+        value = res.value;
+        return *this;
+    }
 
     /*
      * mask related stuff
@@ -1109,6 +1217,52 @@ struct logic {
     }
 
     [[nodiscard]] logic<1> r_xnor() const { return !r_xor(); }
+
+    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    logic<size, signed_, big_endian> operator>>(
+        const logic<new_size, new_signed_, new_big_endian> &amount) const {
+        logic<size, signed_, big_endian> res;
+        if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
+            // return all x
+            res.xz_mask.mask();
+        } else {
+            res.value = value >> amount.value;
+            res.xz_mask = xz_mask >> amount.value;
+        }
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    logic<size, signed_, big_endian> &operator>>=(
+        const logic<new_size, new_signed_, new_big_endian> &amount) {
+        auto res = (*this) >> amount;
+        value = res.value;
+        xz_mask = res.xz_mask;
+        return *this;
+    }
+
+    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    logic<size, signed_, big_endian> operator<<(
+        const logic<new_size, new_signed_, new_big_endian> &amount) const {
+        logic<size, signed_, big_endian> res;
+        if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
+            // return all x
+            res.xz_mask.mask();
+        } else {
+            res.value = value << amount.value;
+            res.xz_mask = xz_mask << amount.value;
+        }
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    logic<size, signed_, big_endian> &operator<<=(
+        const logic<new_size, new_signed_, new_big_endian> &amount) {
+        auto res = (*this) << amount;
+        value = res.value;
+        xz_mask = res.xz_mask;
+        return *this;
+    }
 
     /*
      * constructors
