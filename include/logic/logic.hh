@@ -394,6 +394,64 @@ public:
         return *(this) << amount.values[0];
     }
 
+    big_num<size, signed_, big_endian> ashr(uint64_t amount) const {
+        if constexpr (signed_) {
+            // we will implement logic shifts regardless of the sign
+            big_num<size, signed_, big_endian> res;
+            if (amount > size) [[unlikely]] {
+                if constexpr (signed_) {
+                    if (is_negative()) [[unlikely]] {
+                        res.mask();
+                    }
+                }
+                return res;
+            }
+            // set high bits
+            for (uint64_t i = 0; i < amount; i++) {
+                auto dst = size - i - 1;
+                res.set(dst, true);
+            }
+            for (uint64_t i = amount; i < size; i++) {
+                auto dst = i - amount;
+                res.set(dst, get(i));
+            }
+            return res;
+        } else {
+            return (*this) >> amount;
+        }
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    big_num<size, signed_, big_endian> ashr(
+        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        // we will implement logic shifts regardless of the sign
+        // we utilize the property that, since the max size of the logic is 2^64,
+        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // the result has to be zero
+        for (auto i = 1u; i < amount.s; i++) {
+            if (amount.values[i]) {
+                big_num<size, signed_, big_endian> res;
+                if constexpr (signed_) {
+                    if (is_negative()) [[unlikely]] {
+                        res.mask();
+                    }
+                }
+                return res;
+            }
+        }
+        // now we reduce the problem to a normal shift amount problem
+        return *(this) << amount.values[0];
+    }
+
+    // arithmetic shift right is the same as logical shift right
+    big_num<size, signed_, big_endian> ashl(uint64_t amount) const { return (*this) << amount; }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    big_num<size, signed_, big_endian> ashl(
+        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        return (*this) << amount;
+    }
+
     /*
      * mask related stuff
      */
@@ -439,6 +497,10 @@ public:
 
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
+
+    [[nodiscard]] inline bool is_negative() const requires(signed_) {
+        return this->operator[](size - 1);
+    }
 };
 
 template <uint64_t size, bool signed_ = false, bool big_endian = true>
