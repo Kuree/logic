@@ -361,7 +361,7 @@ public:
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
         // the result has to be zero
-        for (auto i = 1; i < amount.s; i++) {
+        for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) return big_num<size, signed_, big_endian>{};
         }
         // now we reduce the problem to a normal shift amount problem
@@ -432,13 +432,13 @@ public:
 
     template <typename T>
     requires std::is_arithmetic_v<T>
-    [[maybe_unused]] explicit big_num(T v) : values({v}) {}
+    explicit big_num(T v) : values({v}) {}
 
     // set values to 0 when initialized
     big_num() { std::fill(values.begin(), values.end(), 0); }
 
 private:
-    bool get(uint64_t idx) const { return operator[](idx); }
+    [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
 };
 
 template <uint64_t size, bool signed_ = false, bool big_endian = true>
@@ -748,7 +748,7 @@ public:
         bits<size, signed_, big_endian> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num, amount.native_num) {
+        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
             // make sure to mask off any bits dur to signed extension
             res.value = (value >> static_cast<T>(amount.value)) & value_mask(size - amount.value);
         } else if constexpr ((!native_num)) {
@@ -877,7 +877,7 @@ private:
         this->template unpack_<base + arg0_size>(args...);
     }
 
-    T value_mask(uint64_t requested_size) {
+    [[nodiscard]] T value_mask(uint64_t requested_size) const {
         auto mask = std::numeric_limits<uint64_t>::max();
         mask = mask >> (64ull - requested_size);
         return static_cast<T>(mask);
@@ -1202,7 +1202,7 @@ struct logic {
         return one_();
     }
 
-    [[maybe_unused]] [[nodiscard]] logic<1> r_nand() const { return !r_and(); }
+    [[nodiscard]] logic<1> r_nand() const { return !r_and(); }
 
     [[nodiscard]] logic<1> r_or() const {
         for (auto i = 0u; i < size; i++) {

@@ -446,4 +446,50 @@ TEST(logic, bitwise_shift_left) {  // NOLINT
         logic::logic<32, true> ref{-120 * 4};
         EXPECT_EQ(c.str(), ref.str());
     }
+
+    {
+        // normal number shifting
+        logic::logic<20> a{42};
+        logic::logic<60> b{8};
+        auto c = a << b;
+        EXPECT_EQ(c.value.value, 42 << 8);
+    }
+}
+
+TEST(logic, bitwise_shift_right) {  // NOLINT
+    {
+        // big number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        logic::logic<100> b{"1111111111111111"};
+
+        auto c = a >> b;
+        ss = {};
+        for (uint64_t i = 0; i < 120; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+        b = logic::logic<100>{"111"};
+        c = a >> b;
+        ss = {};
+        for (auto i = 0; i < 7; i++) ss << '0';
+        for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+    {
+        // shifts with signed
+        logic::logic<32, true> a{-120};
+        logic::logic<2> b{2};
+        auto c = a >> b;
+        logic::logic<32, false> ref{static_cast<uint32_t>(-120) >> 2};
+        EXPECT_EQ(c.str(), ref.str());
+    }
+
+    {
+        // normal number shifting
+        logic::logic<20> a{42};
+        logic::logic<60> b{8};
+        auto c = a >> b;
+        EXPECT_EQ(c.value.value, 42 >> 8);
+    }
 }
