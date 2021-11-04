@@ -698,3 +698,56 @@ TEST(logic, equal) {  // NOLINT
         EXPECT_EQ(c.str(), "x");
     }
 }
+
+TEST(logic, add) {  // NOLINT
+    {
+        // big number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        ss = {};
+        for (uint64_t i = 0; i < 100; i++) ss << '1';
+        logic::logic<100> b{ss.str()};
+
+        auto c = a + b;
+        ss = {};
+        for (uint64_t i = 0; i < 20; i++) ss << '0';
+        for (uint64_t i = 0; i < (100 - 1); i++) ss << '1';
+        ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+        c  = b + a;
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+    {
+        // big number with small number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        ss = {};
+        for (uint64_t i = 0; i < 40; i++) ss << '1';
+        logic::logic<40> b{ss.str()};
+        auto c = a + b;
+        ss = {};
+
+        for (auto i = 0; i < 80; i++) ss << '0';
+        for (auto i = 0; i < 39; i++) ss << '1';
+        ss << '0';
+        EXPECT_EQ(c.str(), ss.str());
+        c = b + a;
+        EXPECT_EQ(c.str(), ss.str());
+    }
+
+    {
+        // small numbers
+        logic::logic<20> a{100};
+        logic::logic<30> b{10000};
+
+        auto c = a + b;
+        std::string_view ref = "10011101110100";
+        std::stringstream ss;
+        for (auto i = 0u; i < (30 - ref.size()); i++) ss << '0';
+        ss << ref;
+        EXPECT_EQ(c.str(), ss.str());
+    }
+}

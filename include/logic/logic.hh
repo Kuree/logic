@@ -567,6 +567,38 @@ public:
     }
 
     /*
+     * arithmetic operators: + - * / %
+     */
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator+(const big_num<op_size, op_signed, op_big_endian> &op) const {
+        return this->template add<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    }
+
+    big_num<size, signed_, big_endian> operator+(
+        const big_num<size, signed_, big_endian> &op) const {
+        big_num<size, signed_, big_endian> result;
+        uint64_t carry = 0;
+        for (auto i = 0u; i < s; i++) {
+            result.values[i] = carry + values[i] + op.values[i];
+            // notice that this is actually UB to let it overflow!!
+            carry = result.values[i] < values[i];
+        }
+        return result;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size)) big_num<target_size, signed_, big_endian> add(
+        const big_num<op_size, op_signed, op_big_endian> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l + r;
+        return result;
+    }
+
+    /*
      * mask related stuff
      */
     [[nodiscard]] bool any_set() const {
@@ -584,6 +616,10 @@ public:
         // last bits
         values[s - 1] =
             std::numeric_limits<big_num_holder_type>::max() >> (s * big_num_threshold - size);
+    }
+
+    [[maybe_unused]] void unmask() {
+        std::fill(values.begin(), values.end(), 0);
     }
 
     // constructors
@@ -1079,6 +1115,32 @@ public:
     }
 
     /*
+     * arithmetic operators: + - * / %
+     */
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator+(const bits<op_size, op_signed, op_big_endian> &op) const {
+        return this->template add<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    }
+
+    bits<size, signed_, big_endian> operator+(const bits<size, signed_, big_endian> &op) const {
+        bits<size, signed_, big_endian> result;
+        result.value = value + op.value;
+        return result;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size)) bits<target_size, signed_, big_endian> add(
+        const bits<op_size, op_signed, op_big_endian> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l + r;
+        return result;
+    }
+
+    /*
      * mask related stuff
      */
     [[nodiscard]] bool any_set() const requires(native_num) {
@@ -1108,7 +1170,7 @@ public:
                 // from right to left
                 auto c = *iter;
                 if (c == '1') {
-                    value |= 1u << i;
+                    value |= 1ull << i;
                 }
                 iter++;
                 if (iter == v.rend()) break;
@@ -1123,6 +1185,11 @@ public:
     template <typename K>
     requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bits(K v)
         : value(v) {}
+
+    template <bool new_signed, bool new_big_endian>
+    explicit bits(const big_num<size, new_signed, new_big_endian> &big_num) requires(
+        size <= big_num_threshold)
+        : value(big_num.values[0]) {}
 
     bits() {
         if constexpr (native_num) {
@@ -1405,7 +1472,7 @@ struct logic {
     template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
     requires(target_size >= util::max(size, op_size))
         [[nodiscard]] logic<target_size, signed_, big_endian> and_(
-        const logic<op_size, op_signed, op_big_endian> &op) const {
+            const logic<op_size, op_signed, op_big_endian> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l & r;
@@ -1504,7 +1571,7 @@ struct logic {
     template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
     requires(target_size >= util::max(size, op_size))
         [[nodiscard]] logic<target_size, signed_, big_endian> xor_(
-        const logic<op_size, op_signed, op_big_endian> &op) const {
+            const logic<op_size, op_signed, op_big_endian> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -1658,6 +1725,33 @@ struct logic {
     }
 
     /*
+     * arithmetic operators: + - * / %
+     */
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator+(const logic<op_size, op_signed, op_big_endian> &op) const {
+        return this->template add<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    }
+
+    logic<size, signed_, big_endian> operator+(const logic<size, signed_, big_endian> &op) const {
+        if (xz_mask.any_set() || op.xz_mask.any_set()) [[unlikely]] {
+            return logic<size, signed_, big_endian>();
+        } else {
+            return logic<size, signed_, big_endian>{value + op.value};
+        }
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size))
+        [[nodiscard]] logic<target_size, signed_, big_endian> add(
+            const logic<op_size, op_signed, op_big_endian> &op) const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l + r;
+        return result;
+    }
+
+    /*
      * constructors
      */
     // by default everything is x
@@ -1691,7 +1785,7 @@ struct logic {
     }
 
     // conversion from bits to logic
-    constexpr explicit logic(const bits<size, signed_, big_endian> &b) : value(b) {}
+    constexpr explicit logic(bits<size, signed_, big_endian> &&b) : value(std::move(b)) {}
 
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
