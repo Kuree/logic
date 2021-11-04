@@ -165,6 +165,7 @@ TEST(logic, bool_) {  // NOLINT
 }
 
 TEST(logic, and_) {  // NOLINT
+    using namespace std::literals;
     {
         logic::logic<1> a{"0"}, b{"1"};
         auto c = a & b;
@@ -193,6 +194,38 @@ TEST(logic, and_) {  // NOLINT
         logic::logic<1> a{"1"}, b{"z"};
         auto c = a & b;
         EXPECT_EQ("x", c.str());
+    }
+
+    // big number with big number
+    {
+        std::stringstream ss;
+        for (auto i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        auto const s = "1010101010"sv;
+        logic::logic<140> b{s};
+        auto c = a & b;
+        ss = {};
+        for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
+        ss << s;
+        EXPECT_EQ(ss.str(), c.str());
+        c = b & a;
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+    // big number with native number
+    {
+        std::stringstream ss;
+        for (auto i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        auto const s = "1010101010"sv;
+        logic::logic<40> b{s};
+        auto c = a & b;
+        ss = {};
+        for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
+        ss << s;
+        EXPECT_EQ(ss.str(), c.str());
+        c = b & a;
+        EXPECT_EQ(ss.str(), c.str());
     }
 }
 
@@ -494,7 +527,7 @@ TEST(logic, bitwise_shift_right) {  // NOLINT
     }
 }
 
-TEST(logic, arithmetic_shift_left) {    // NOLINT
+TEST(logic, arithmetic_shift_left) {  // NOLINT
     {
         // big number
         std::stringstream ss;
@@ -531,7 +564,6 @@ TEST(logic, arithmetic_shift_left) {    // NOLINT
         EXPECT_EQ(c.value.value, 42 << 8);
     }
 }
-
 
 TEST(logic, arithmetic_shift_right) {  // NOLINT
     {
@@ -577,7 +609,7 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
     }
 }
 
-TEST(logic, equal) {    // NOLINT
+TEST(logic, equal) {  // NOLINT
     {
         logic::logic<1> a{true};
         auto b = a == logic::logic<10>{1u};

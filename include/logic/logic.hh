@@ -198,16 +198,21 @@ public:
         return res;
     }
 
-    template <uint64_t new_size>
-    requires(new_size > size) big_num<new_size, signed_> extend()
-    const {
-        big_num<new_size, signed_, big_endian> result;
-        util::copy(result.values, values, 0, s);
-        // based on the sign, need to fill out leading ones
-        if constexpr (signed_) {
-            for (uint64_t i = size; i < new_size; i++) {
-                set<i>(true);
+    template <uint64_t op_size>
+    big_num<op_size, signed_> extend() const {
+        if constexpr (op_size > size) {
+            big_num<op_size, signed_, big_endian> result;
+            for (auto i = 0ul; i < s; i++) result.values[i] = values[i];
+            // based on the sign, need to fill out leading ones
+            if constexpr (signed_) {
+                for (uint64_t i = size; i < op_size; i++) {
+                    set<i>(true);
+                }
             }
+            return result;
+        } else {
+            // just a copy
+            return *this;
         }
     }
 
@@ -245,6 +250,13 @@ public:
         return std::accumulate(values.begin(), values.end(), std::popcount);
     }
 
+    void mask_off() {
+        // mask off bits that's excessive bits
+        auto constexpr amount = s * 64 - size;
+        auto constexpr mask = std::numeric_limits<uint64_t>::max() >> (64 - amount);
+        values[s - 1] &= mask;
+    }
+
     /*
      * boolean operators
      */
@@ -260,9 +272,19 @@ public:
         }
         // mask off the top bits, if any
         for (auto i = size; i < s * big_num_threshold; i++) {
-            set(i, false);
+            result.set(i, false);
         }
         return result;
+    }
+
+    // need to conform to LRM 11.6.1
+    // During the evaluation of an expression,
+    // interim results shall take the size of the largest operand (in case of an
+    // assignment, this also includes the left-hand side).
+    // Care has to be taken to prevent loss of a significant bit during expression evaluation.
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator&(const big_num<op_size, op_signed, op_big_endian> &op) const {
+        return this->template and_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
     }
 
     big_num<size, signed_, big_endian> operator&(
@@ -271,15 +293,38 @@ public:
         for (uint i = 0; i < s; i++) {
             result.values[i] = values[i] & op.values[i];
         }
+        result.mask_off();
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size))
+        big_num<target_size, signed_, big_endian> and_(
+            const big_num<op_size, op_signed, op_big_endian> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l & r;
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     big_num<size, signed_, big_endian> &operator&=(
-        const big_num<size, signed_, big_endian> &op) const {
-        for (uint i = 0; i < s; i++) {
-            values[i] &= op.values[i];
+        const big_num<op_size, op_signed, op_big_endian> &op) {
+        auto v = (*this) & op;
+        if constexpr (op_size > size) {
+            // need to size it down
+            v = v.template slice<size>();
         }
+        this->values = v.values;
+        mask_off();
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator^(const big_num<op_size, op_signed, op_big_endian> &op) const {
+        return this->template xor_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
     }
 
     big_num<size, signed_, big_endian> operator^(
@@ -291,12 +336,34 @@ public:
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size))
+        big_num<target_size, signed_, big_endian> xor_(
+            const big_num<op_size, op_signed, op_big_endian> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l ^ r;
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     big_num<size, signed_, big_endian> &operator^=(
-        const big_num<size, signed_, big_endian> &op) const {
-        for (uint i = 0; i < s; i++) {
-            values[i] ^= op.values[i];
+        const big_num<op_size, op_signed, op_big_endian> &op) {
+        auto v = (*this) ^ op;
+        if constexpr (op_size > size) {
+            // need to size it down
+            v = v.template slice<size>();
         }
+        this->values = v.values;
+        mask_off();
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator|(const big_num<op_size, op_signed, op_big_endian> &op) const {
+        return this->template or_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
     }
 
     big_num<size, signed_, big_endian> operator|(
@@ -308,11 +375,27 @@ public:
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    requires(target_size >= util::max(size, op_size)) big_num<target_size, signed_, big_endian> or_(
+        const big_num<op_size, op_signed, op_big_endian> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l | r;
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     big_num<size, signed_, big_endian> &operator|=(
-        const big_num<size, signed_, big_endian> &op) const {
-        for (uint i = 0; i < s; i++) {
-            values[i] |= op.values[i];
+        const big_num<op_size, op_signed, op_big_endian> &op) const {
+        auto v = (*this) | op;
+        if constexpr (op_size > size) {
+            // need to size it down
+            v = v.template slice<size>();
         }
+        this->values = v.values;
+        mask_off();
         return *this;
     }
 
@@ -354,9 +437,9 @@ public:
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     big_num<size, signed_, big_endian> operator>>(
-        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        const big_num<op_size, op_signed, op_big_endian> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
@@ -380,9 +463,9 @@ public:
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     big_num<size, signed_, big_endian> operator<<(
-        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        const big_num<op_size, op_signed, op_big_endian> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
@@ -423,9 +506,9 @@ public:
         }
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
-    big_num<size, signed_, big_endian> ashr(
-        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    [[maybe_unused]] big_num<size, signed_, big_endian> ashr(
+        const big_num<op_size, op_signed, op_big_endian> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
@@ -450,15 +533,15 @@ public:
         return (*this) << amount;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     [[maybe_unused]] big_num<size, signed_, big_endian> ashl(
-        const big_num<new_size, new_signed, new_big_endian> &amount) const {
+        const big_num<op_size, op_signed, op_big_endian> &amount) const {
         return (*this) << amount;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
-    bool operator==(const big_num<new_size, new_signed, new_big_endian> &target) const {
-        if constexpr (size >= new_size) {
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    bool operator==(const big_num<op_size, op_signed, op_big_endian> &target) const {
+        if constexpr (size >= op_size) {
             for (auto i = 0u; i < target.s; i++) {
                 if (values[i] != target.values[i]) return false;
             }
@@ -664,27 +747,27 @@ public:
     // extension
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
-    template <uint64_t new_size>
-    requires(new_size > size &&
-             util::native_num(new_size)) bits<new_size, signed_, big_endian> extend()
-    const { return bits<new_size, signed_, big_endian>(value); }
+    template <uint64_t op_size>
+    requires(op_size > size &&
+             util::native_num(op_size)) bits<op_size, signed_, big_endian> extend()
+    const { return bits<op_size, signed_, big_endian>(value); }
 
     // same size, just use the default copy constructor
-    template <uint64_t new_size>
-    requires(new_size == size) bits<new_size, signed_, big_endian> extend()
+    template <uint64_t op_size>
+    requires(op_size == size) bits<op_size, signed_, big_endian> extend()
     const { return *this; }
 
     // new size is smaller. this is just a slice
-    template <uint64_t new_size>
-    requires(new_size < size) bits<new_size, signed_, big_endian> extend()
-    const { return slice<new_size - 1, 0>(); }
+    template <uint64_t op_size>
+    requires(op_size < size) bits<op_size, signed_, big_endian> extend()
+    const { return slice<op_size - 1, 0>(); }
 
     // native number, but extend to a big number
-    template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) &&
-             native_num) bits<new_size, signed_, big_endian> extend()
+    template <uint64_t op_size>
+    requires(op_size > size && !util::native_num(op_size) &&
+             native_num) bits<op_size, signed_, big_endian> extend()
     const {
-        bits<new_size, signed_, big_endian> result;
+        bits<op_size, signed_, big_endian> result;
         // use C++ default semantics to cast
         result.value.values[0] = static_cast<big_num_holder_type>(value);
         if constexpr (signed_) {
@@ -698,10 +781,14 @@ public:
     }
 
     // big number and gets extended to a big number
-    template <uint64_t new_size>
-    requires(new_size > size && !util::native_num(new_size) &&
-             !native_num) bits<new_size, signed_, big_endian> extend()
-    const { return value.template extend<new_size>(); }
+    template <uint64_t op_size>
+    requires(op_size > size && !util::native_num(op_size) &&
+             !native_num) bits<op_size, signed_, big_endian> extend()
+    const {
+        bits<op_size, signed_, big_endian> res;
+        res.value = value.template extend<op_size>();
+        return res;
+    }
 
     /*
      * concatenation
@@ -772,16 +859,39 @@ public:
         return result;
     }
 
+    template <uint64_t op_size, bool op_signed, bool op_endian>
+    bits<size, signed_, big_endian> operator&(const bits<op_size, op_signed, op_endian> &op) const {
+        return this->template and_<util::max(op_size, size), op_size, op_signed, op_endian>(op);
+    }
+
     bits<size, signed_, big_endian> operator&(const bits<size, signed_, big_endian> &op) const {
         bits<size, signed_, big_endian> result;
         result.value = value & op.value;
         return result;
     }
 
-    bits<size, signed_, big_endian> &operator&=(const bits<size, signed_, big_endian> &op) {
-        bits<size, signed_, big_endian> result;
-        value &= op.value;
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_endian>
+    requires(target_size >= util::max(size, op_size)) bits<target_size, signed_, big_endian> and_(
+        const bits<op_size, op_signed, op_endian> &op)
+    const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l & r;
+        result.mask_off();
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_endian>
+    bits<size, signed_, big_endian> &operator&=(const bits<op_size, op_signed, op_endian> &op) {
+        auto res = (*this) & op;
+        value = res.value;
+        mask_off();
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_endian>
+    bits<size, signed_, big_endian> operator^(const bits<op_size, op_signed, op_endian> &op) const {
+        return this->template xor_<util::max(op_size, size), op_size, op_signed, op_endian>(op);
     }
 
     bits<size, signed_, big_endian> operator^(const bits<size, signed_, big_endian> &op) const {
@@ -790,10 +900,28 @@ public:
         return result;
     }
 
-    bits<size, signed_, big_endian> &operator^=(const bits<size, signed_, big_endian> &op) {
-        bits<size, signed_, big_endian> result;
-        value ^= op.value;
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_endian>
+    requires(target_size >= util::max(size, op_size)) bits<target_size, signed_, big_endian> xor_(
+        const bits<op_size, op_signed, op_endian> &op)
+    const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l ^ r;
+        result.mask_off();
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_endian>
+    bits<size, signed_, big_endian> &operator^=(const bits<op_size, op_signed, op_endian> &op) {
+        auto res = (*this) ^ op;
+        value = res.value;
+        mask_off();
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_endian>
+    bits<size, signed_, big_endian> operator|(const bits<op_size, op_signed, op_endian> &op) const {
+        return this->template or_<util::max(op_size, size), op_size, op_signed, op_endian>(op);
     }
 
     bits<size, signed_, big_endian> operator|(const bits<size, signed_, big_endian> &op) const {
@@ -802,9 +930,21 @@ public:
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_endian>
+    requires(target_size >= util::max(size, op_size)) bits<target_size, signed_, big_endian> or_(
+        const bits<op_size, op_signed, op_endian> &op)
+    const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l | r;
+        result.mask_off();
+        return result;
+    }
+
     bits<size, signed_, big_endian> &operator|=(const bits<size, signed_, big_endian> &op) {
-        bits<size, signed_, big_endian> result;
-        value |= op.value;
+        auto res = (*this) | op;
+        value = res.value;
+        mask_off();
         return *this;
     }
 
@@ -834,13 +974,13 @@ public:
 
     [[maybe_unused]] [[nodiscard]] bool r_xnor() const { return !r_xor(); }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> operator>>(
-        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        const bits<op_size, op_signed, op_big_endian> &amount) const {
         bits<size, signed_, big_endian> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
+        if constexpr (native_num && bits<op_size, op_signed, op_big_endian>::native_num) {
             // make sure to mask off any bits dur to signed extension
             res.value = (value >> static_cast<T>(amount.value)) & value_mask(size - amount.value);
         } else if constexpr ((!native_num)) {
@@ -857,23 +997,23 @@ public:
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> &operator>>=(
-        const bits<new_size, new_signed, new_big_endian> &amount) {
+        const bits<op_size, op_signed, op_big_endian> &amount) {
         auto res = (*this) >> amount;
         value = res.value;
         return *this;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> operator<<(
-        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        const bits<op_size, op_signed, op_big_endian> &amount) const {
         bits<size, signed_, big_endian> res;
         // couple cases
         // 1. both of them are native number
         // clang doesn't allow accessing native_num as amount.native_num
         // see https://stackoverflow.com/a/44996066
-        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
+        if constexpr (native_num && bits<op_size, op_signed, op_big_endian>::native_num) {
             res.value = value << static_cast<T>(amount.value);
         } else if constexpr ((!native_num)) {
             res.value = value << amount.value;
@@ -889,21 +1029,21 @@ public:
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> &operator<<=(
-        const bits<new_size, new_signed, new_big_endian> &amount) {
+        const bits<op_size, op_signed, op_big_endian> &amount) {
         auto res = (*this) << amount;
         value = res.value;
         return *this;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> ashr(
-        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        const bits<op_size, op_signed, op_big_endian> &amount) const {
         bits<size, signed_, big_endian> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
+        if constexpr (native_num && bits<op_size, op_signed, op_big_endian>::native_num) {
             // no need to mask since C++ does arithmetic shifts by default
             res.value = value >> static_cast<T>(amount.value);
         } else if constexpr ((!native_num)) {
@@ -920,16 +1060,16 @@ public:
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     bits<size, signed_, big_endian> ashl(
-        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        const bits<op_size, op_signed, op_big_endian> &amount) const {
         // this is the same as bitwise shift left
         return (*this) << amount;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
-    bool operator==(const bits<new_size, new_signed, new_big_endian> &v) const {
-        if constexpr (native_num && bits<new_size>::native_num) {
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    bool operator==(const bits<op_size, op_signed, op_big_endian> &v) const {
+        if constexpr (native_num && bits<op_size>::native_num) {
             return value == static_cast<T>(v.value);
         } else if constexpr (!native_num) {
             return value == v.value;
@@ -1013,6 +1153,19 @@ private:
         auto mask = std::numeric_limits<uint64_t>::max();
         mask = mask >> (64ull - requested_size);
         return static_cast<T>(mask);
+    }
+
+    void mask_off() {
+        if constexpr (native_num) {
+            if constexpr (size > 1) {
+                auto constexpr amount = sizeof(T) * 8 - size;
+                auto constexpr mask_max = std::numeric_limits<T>::max();
+                auto mask = mask_max >> amount;
+                value &= mask;
+            }
+        } else {
+            value.mask_off();
+        }
     }
 };
 
@@ -1158,6 +1311,18 @@ struct logic {
     }
 
     /*
+     * extend
+     */
+    template <uint64_t target_size>
+    requires(target_size >= size) logic<target_size, signed_, big_endian> extend()
+    const {
+        logic<target_size, signed_, big_endian> result;
+        result.value = value.template extend<target_size>();
+        result.xz_mask = xz_mask.template extend<target_size>();
+        return result;
+    }
+
+    /*
      * concatenation
      */
     template <uint64_t arg0_size>
@@ -1204,6 +1369,12 @@ struct logic {
     /*
      * bitwise operators
      */
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator&(const logic<op_size, op_signed, op_big_endian> &op) const {
+        return this->template and_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    }
+
     logic<size, signed_, big_endian> operator&(const logic<size, signed_, big_endian> &op) const {
         // this is the truth table
         //   0 1 x z
@@ -1231,11 +1402,25 @@ struct logic {
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    [[nodiscard]] logic<target_size, signed_, big_endian> and_(
+        const logic<op_size, op_signed, op_big_endian> &op) const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l & r;
+        return result;
+    }
+
     logic<size, signed_, big_endian> operator&=(const logic<size, signed_, big_endian> &op) {
         auto const res = (*this) & op;
         this->value = res.value;
         this->xz_mask = res.xz_mask;
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator|(const logic<op_size, op_signed, op_big_endian> &op) const {
+        return this->template or_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
     }
 
     logic<size, signed_, big_endian> operator|(const logic<size, signed_, big_endian> &op) const {
@@ -1271,11 +1456,25 @@ struct logic {
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    [[nodiscard]] logic<target_size, signed_, big_endian> or_(
+        const logic<op_size, op_signed, op_big_endian> &op) const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l | r;
+        return result;
+    }
+
     logic<size, signed_, big_endian> operator|=(const logic<size, signed_, big_endian> &op) {
         auto const res = (*this) | op;
         this->value = res.value;
         this->xz_mask = res.xz_mask;
         return *this;
+    }
+
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    auto operator^(const logic<op_size, op_signed, op_big_endian> &op) const {
+        return this->template xor_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
     }
 
     logic<size, signed_, big_endian> operator^(const logic<size, signed_, big_endian> &op) const {
@@ -1297,6 +1496,15 @@ struct logic {
         // notice that for the rest of the empty cells, xz_mask is set properly
         // we use that to create a msk of change everything into x
         result.value &= ~result.xz_mask;
+        return result;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
+    [[nodiscard]] logic<target_size, signed_, big_endian> xor_(
+        const logic<op_size, op_signed, op_big_endian> &op) const {
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l | r;
         return result;
     }
 
@@ -1366,9 +1574,9 @@ struct logic {
 
     [[nodiscard]] logic<1> r_xnor() const { return !r_xor(); }
 
-    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
     logic<size, signed_, big_endian> operator>>(
-        const logic<new_size, new_signed_, new_big_endian> &amount) const {
+        const logic<op_size, op_signed_, op_big_endian> &amount) const {
         logic<size, signed_, big_endian> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
@@ -1380,18 +1588,18 @@ struct logic {
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
     logic<size, signed_, big_endian> &operator>>=(
-        const logic<new_size, new_signed_, new_big_endian> &amount) {
+        const logic<op_size, op_signed_, op_big_endian> &amount) {
         auto res = (*this) >> amount;
         value = res.value;
         xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
     logic<size, signed_, big_endian> operator<<(
-        const logic<new_size, new_signed_, new_big_endian> &amount) const {
+        const logic<op_size, op_signed_, op_big_endian> &amount) const {
         logic<size, signed_, big_endian> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
@@ -1403,18 +1611,18 @@ struct logic {
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed_, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
     logic<size, signed_, big_endian> &operator<<=(
-        const logic<new_size, new_signed_, new_big_endian> &amount) {
+        const logic<op_size, op_signed_, op_big_endian> &amount) {
         auto res = (*this) << amount;
         value = res.value;
         xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     logic<size, signed_, big_endian> ashr(
-        const logic<new_size, new_signed, new_big_endian> &amount) const {
+        const logic<op_size, op_signed, op_big_endian> &amount) const {
         logic<size, signed_, big_endian> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
@@ -1426,9 +1634,9 @@ struct logic {
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
     logic<size, signed_, big_endian> ashl(
-        const logic<new_size, new_signed, new_big_endian> &amount) const {
+        const logic<op_size, op_signed, op_big_endian> &amount) const {
         logic<size, signed_, big_endian> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
@@ -1440,8 +1648,8 @@ struct logic {
         return res;
     }
 
-    template <uint64_t new_size, bool new_signed, bool new_big_endian>
-    logic<1> operator==(const logic<new_size, new_signed, new_big_endian> &target) const {
+    template <uint64_t op_size, bool op_signed, bool op_big_endian>
+    logic<1> operator==(const logic<op_size, op_signed, op_big_endian> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value == target.value ? one_() : zero_();
     }
