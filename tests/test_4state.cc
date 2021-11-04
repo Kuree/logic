@@ -576,3 +576,27 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
         EXPECT_EQ(c.str(), ss.str());
     }
 }
+
+TEST(logic, equal) {    // NOLINT
+    {
+        logic::logic<1> a{true};
+        auto b = a == logic::logic<10>{1u};
+        EXPECT_EQ(b.str(), "1");
+    }
+
+    {
+        // with big number
+        logic::logic<120> a{std::numeric_limits<uint64_t>::max() - 1};
+        logic::logic<420> b{std::numeric_limits<uint64_t>::max()};
+        auto c = a == b;
+        EXPECT_EQ(c.str(), "0");
+    }
+
+    {
+        // with x and z
+        logic::logic<1024> a{"x"};
+        logic::logic<20> b{12};
+        auto c = a == b;
+        EXPECT_EQ(c.str(), "x");
+    }
+}

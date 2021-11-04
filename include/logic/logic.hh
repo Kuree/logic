@@ -456,6 +456,33 @@ public:
         return (*this) << amount;
     }
 
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bool operator==(const big_num<new_size, new_signed, new_big_endian> &target) const {
+        if constexpr (size >= new_size) {
+            for (auto i = 0u; i < target.s; i++) {
+                if (values[i] != target.values[i]) return false;
+            }
+            for (auto i = target.s; i < s; i++) {
+                if (!values[i]) return false;
+            }
+        } else {
+            for (auto i = 0u; i < s; i++) {
+                if (values[i] != target.values[i]) return false;
+            }
+            for (auto i = s; i < target.s; i++) {
+                if (!target.values[i]) return false;
+            }
+        }
+        return true;
+    }
+
+    template <typename T>
+    requires(std::is_arithmetic_v<T>) bool operator==(T v) const {
+        auto v_casted = static_cast<uint64_t>(v);
+        if (v_casted != values[0]) return false;
+        return std::all_of(values.begin() + 1, values.end(), [](auto c) { return c == 0; });
+    }
+
     /*
      * mask related stuff
      */
@@ -900,6 +927,17 @@ public:
         return (*this) << amount;
     }
 
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bool operator==(const bits<new_size, new_signed, new_big_endian> &v) const {
+        if constexpr (native_num && bits<new_size>::native_num) {
+            return value == static_cast<T>(v.value);
+        } else if constexpr (!native_num) {
+            return value == v.value;
+        }
+        // clang-13 errors out if there is an else clause here
+        return value == v.value;
+    }
+
     /*
      * mask related stuff
      */
@@ -921,7 +959,6 @@ public:
     /*
      * constructors
      */
-    constexpr explicit bits(const char *str) : bits(std::string_view(str)) {}
     explicit bits(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
@@ -1401,6 +1438,12 @@ struct logic {
             res.xz_mask = xz_mask.ashl(amount.value);
         }
         return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    logic<1> operator==(const logic<new_size, new_signed, new_big_endian> &target) const {
+        if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
+        return value == target.value ? one_() : zero_();
     }
 
     /*
