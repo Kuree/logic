@@ -1403,7 +1403,8 @@ struct logic {
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    [[nodiscard]] logic<target_size, signed_, big_endian> and_(
+    requires(target_size >= util::max(size, op_size))
+        [[nodiscard]] logic<target_size, signed_, big_endian> and_(
         const logic<op_size, op_signed, op_big_endian> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1457,8 +1458,9 @@ struct logic {
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    [[nodiscard]] logic<target_size, signed_, big_endian> or_(
-        const logic<op_size, op_signed, op_big_endian> &op) const {
+    requires(target_size >= util::max(size, op_size))
+        [[nodiscard]] logic<target_size, signed_, big_endian> or_(
+            const logic<op_size, op_signed, op_big_endian> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -1500,7 +1502,8 @@ struct logic {
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    [[nodiscard]] logic<target_size, signed_, big_endian> xor_(
+    requires(target_size >= util::max(size, op_size))
+        [[nodiscard]] logic<target_size, signed_, big_endian> xor_(
         const logic<op_size, op_signed, op_big_endian> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
