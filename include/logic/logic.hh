@@ -398,7 +398,8 @@ public:
         if constexpr (signed_) {
             // we will implement logic shifts regardless of the sign
             big_num<size, signed_, big_endian> res;
-            if (amount > size) [[unlikely]] {
+            // notice that we need size - 1 since the top bit is always signed bit
+            if (amount > (size - 1)) [[unlikely]] {
                 if constexpr (signed_) {
                     if (is_negative()) [[unlikely]] {
                         res.mask();
@@ -407,11 +408,12 @@ public:
                 return res;
             }
             // set high bits
+            bool negative = is_negative();
             for (uint64_t i = 0; i < amount; i++) {
                 auto dst = size - i - 1;
-                res.set(dst, true);
+                res.set(dst, negative);
             }
-            for (uint64_t i = amount; i < size; i++) {
+            for (uint64_t i = amount; i < (size - 1); i++) {
                 auto dst = i - amount;
                 res.set(dst, get(i));
             }
@@ -428,9 +430,9 @@ public:
         // we utilize the property that, since the max size of the logic is 2^64,
         // if the big number amount actually uses more than 1 uint64 and high bits set,
         // the result has to be zero
+        big_num<size, signed_, big_endian> res;
         for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) {
-                big_num<size, signed_, big_endian> res;
                 if constexpr (signed_) {
                     if (is_negative()) [[unlikely]] {
                         res.mask();
@@ -440,14 +442,16 @@ public:
             }
         }
         // now we reduce the problem to a normal shift amount problem
-        return *(this) << amount.values[0];
+        return this->ashr(amount.values[0]);
     }
 
     // arithmetic shift right is the same as logical shift right
-    big_num<size, signed_, big_endian> ashl(uint64_t amount) const { return (*this) << amount; }
+    [[maybe_unused]] big_num<size, signed_, big_endian> ashl(uint64_t amount) const {
+        return (*this) << amount;
+    }
 
     template <uint64_t new_size, bool new_signed, bool new_big_endian>
-    big_num<size, signed_, big_endian> ashl(
+    [[maybe_unused]] big_num<size, signed_, big_endian> ashl(
         const big_num<new_size, new_signed, new_big_endian> &amount) const {
         return (*this) << amount;
     }
@@ -473,7 +477,7 @@ public:
     }
 
     // constructors
-    explicit big_num(std::string_view v) {
+    constexpr explicit big_num(std::string_view v) {
         std::fill(values.begin(), values.end(), 0);
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
@@ -498,9 +502,8 @@ public:
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
 
-    [[nodiscard]] inline bool is_negative() const requires(signed_) {
-        return this->operator[](size - 1);
-    }
+    // NOLINTNEXTLINE
+    [[nodiscard]] bool is_negative() const { return this->operator[](size - 1); }
 };
 
 template <uint64_t size, bool signed_ = false, bool big_endian = true>
@@ -867,6 +870,36 @@ public:
         return *this;
     }
 
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> ashr(
+        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        bits<size, signed_, big_endian> res;
+        // couple cases
+        // 1. both of them are native number
+        if constexpr (native_num && bits<new_size, new_signed, new_big_endian>::native_num) {
+            // no need to mask since C++ does arithmetic shifts by default
+            res.value = value >> static_cast<T>(amount.value);
+        } else if constexpr ((!native_num)) {
+            res.value = value.ashr(amount.value);
+        } else {
+            // itself is a native number but amount is not
+            // convert to itself as a big number
+            big_num<size, signed_, big_endian> big_num;
+            big_num.values[0] = static_cast<uint64_t>(value);
+            auto res_num = big_num.ashr(amount);
+            res.value = static_cast<T>(res_num.values[0]);
+        }
+
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    bits<size, signed_, big_endian> ashl(
+        const bits<new_size, new_signed, new_big_endian> &amount) const {
+        // this is the same as bitwise shift left
+        return (*this) << amount;
+    }
+
     /*
      * mask related stuff
      */
@@ -905,7 +938,7 @@ public:
             }
         } else {
             // big num
-            value = big_num<size>(v);
+            value = big_num<size, signed_, big_endian>(v);
         }
     }
 
@@ -1340,6 +1373,34 @@ struct logic {
         value = res.value;
         xz_mask = res.xz_mask;
         return *this;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    logic<size, signed_, big_endian> ashr(
+        const logic<new_size, new_signed, new_big_endian> &amount) const {
+        logic<size, signed_, big_endian> res;
+        if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
+            // return all x
+            res.xz_mask.mask();
+        } else {
+            res.value = value.ashr(amount.value);
+            res.xz_mask = xz_mask.ashr(amount.value);
+        }
+        return res;
+    }
+
+    template <uint64_t new_size, bool new_signed, bool new_big_endian>
+    logic<size, signed_, big_endian> ashl(
+        const logic<new_size, new_signed, new_big_endian> &amount) const {
+        logic<size, signed_, big_endian> res;
+        if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
+            // return all x
+            res.xz_mask.mask();
+        } else {
+            res.value = value.ashl(amount.value);
+            res.xz_mask = xz_mask.ashl(amount.value);
+        }
+        return res;
     }
 
     /*

@@ -493,3 +493,86 @@ TEST(logic, bitwise_shift_right) {  // NOLINT
         EXPECT_EQ(c.value.value, 42 >> 8);
     }
 }
+
+TEST(logic, arithmetic_shift_left) {    // NOLINT
+    {
+        // big number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        logic::logic<100> b{"1111111111111111"};
+
+        auto c = a.ashl(b);
+        ss = {};
+        for (uint64_t i = 0; i < 120; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+        b = logic::logic<100>{"111"};
+        c = a.ashl(b);
+        ss = {};
+        for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
+        for (auto i = 0; i < 7; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+    {
+        // shifts with signed
+        logic::logic<32, true> a{-120};
+        logic::logic<2> b{2};
+        auto c = a.ashl(b);
+        logic::logic<32, true> ref{-120 * 4};
+        EXPECT_EQ(c.str(), ref.str());
+    }
+
+    {
+        // normal number shifting
+        logic::logic<20> a{42};
+        logic::logic<60> b{8};
+        auto c = a.ashl(b);
+        EXPECT_EQ(c.value.value, 42 << 8);
+    }
+}
+
+
+TEST(logic, arithmetic_shift_right) {  // NOLINT
+    {
+        // big number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120> a{ss.str()};
+        logic::logic<100> b{"1111111111111111"};
+
+        auto c = a.ashr(b);
+        ss = {};
+        for (uint64_t i = 0; i < 120; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+        b = logic::logic<100>{"111"};
+        c = a >> b;
+        ss = {};
+        for (auto i = 0; i < 7; i++) ss << '0';
+        for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+    {
+        // shifts with signed
+        logic::logic<32, true> a{-120};
+        logic::logic<2> b{2};
+        auto c = a.ashr(b);
+        logic::logic<32, true> ref{-120 >> 2};
+        EXPECT_EQ(c.str(), ref.str());
+    }
+
+    {
+        // big number signed shifting
+        std::stringstream ss;
+        ss << '1';
+        for (auto i = 0; i < (420 - 1); i++) ss << '0';
+        logic::logic<420, true> a{ss.str()};
+        logic::logic<120> b{42ul};
+        auto c = a.ashr(b);
+        ss = {};
+        for (auto i = 0; i < 42; i++) ss << '1';
+        for (auto i = 42; i < 420; i++) ss << '0';
+        EXPECT_EQ(c.str(), ss.str());
+    }
+}
