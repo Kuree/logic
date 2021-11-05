@@ -629,10 +629,10 @@ private:
     [[nodiscard]] bool is_negative() const { return this->operator[](size - 1); }
 };
 
-template <uint64_t size, bool signed_ = false, bool big_endian = true>
+template <int msb = 0, int lsb = 0, bool signed_ = false>
 struct logic;
 
-template <int msb, int lsb = 0, bool signed_ = false>
+template <int msb = 0, int lsb = 0, bool signed_ = false>
 struct bits {
 private:
 public:
@@ -768,14 +768,9 @@ public:
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
     template <uint64_t target_size>
-    requires(target_size > size &&
+    requires(target_size >= size &&
              util::native_num(target_size)) bits<target_size, signed_> extend()
     const { return bits<target_size, signed_>(value); }
-
-    // same size, just use the default copy constructor
-    template <uint64_t target_size>
-    requires(target_size == size) bits<target_size, signed_> extend()
-    const { return *this; }
 
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
@@ -881,13 +876,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto operator&(const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
         return this->template and_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    template <int op_lsb>
-    auto operator&(const bits<size - 1 + op_lsb, op_lsb, false> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator&(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         bits<size - 1, 0, false> result;
         result.value = value & op.value;
         return result;
@@ -913,13 +909,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto operator^(const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
         return this->template xor_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    template <int op_lsb>
-    auto operator^(const bits<size - 1 + op_lsb, op_lsb, false> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator^(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         bits<size - 1, 0, false> result;
         result.value = value ^ op.value;
         return result;
@@ -945,13 +942,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto operator|(const bits<size - 1 + op_lsb, op_lsb, false> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
+        const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
         return this->template or_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    template <int op_lsb>
-    auto operator|(const bits<size - 1 + op_lsb, op_lsb, false> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator|(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         bits<size - 1, 0, false> result;
         result.value = value | op.value;
         return result;
@@ -1110,8 +1108,8 @@ public:
         return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    template <int op_lsb>
-    auto operator+(const bits<size - 1 + op_lsb, op_lsb, false> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator+(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         bits<size, signed_, big_endian> result;
         result.value = value + op.value;
         return result;
@@ -1186,29 +1184,11 @@ public:
         // for big number it's already set to 0
     }
 
-private:
-    /*
-     * unpacking, which is basically slicing as syntax sugars
-     */
-    template <uint64_t base, uint64_t arg0_msb, uint64_t arg0_lsb, bool arg0_signed>
-    requires(base < size) void unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
-        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
-        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
-        arg0.value = this->template slice<base, upper_bound>();
-    }
-
-    template <uint64_t base = 0, uint64_t arg0_msb, uint64_t arg0_lsb, bool arg0_signed,
-              typename... Ts>
-    [[maybe_unused]] auto unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
-        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
-        this->template unpack_<base, arg0_size>(arg0);
-        this->template unpack_<base + arg0_size>(args...);
-    }
-
-    [[nodiscard]] T value_mask(uint64_t requested_size) const {
-        auto mask = std::numeric_limits<uint64_t>::max();
-        mask = mask >> (64ull - requested_size);
-        return static_cast<T>(mask);
+    // implicit conversion via assignment
+    template <int new_msb, int new_lsb, bool new_signed>
+    bits<msb, lsb, signed_> &operator=(const bits<new_msb, new_lsb, new_signed> &b) {
+        value = b.value;
+        return *this;
     }
 
     void mask_off() {
@@ -1223,16 +1203,42 @@ private:
             value.mask_off();
         }
     }
+
+private:
+    /*
+     * unpacking, which is basically slicing as syntax sugars
+     */
+    template <int base, int arg0_msb, int arg0_lsb, bool arg0_signed>
+    requires(base < size) void unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
+        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
+        arg0.value = this->template slice<base, upper_bound>();
+    }
+
+    template <int base = 0, int arg0_msb, int arg0_lsb, bool arg0_signed, typename... Ts>
+    [[maybe_unused]] auto unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
+        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
+        this->template unpack_<base, arg0_msb, arg0_lsb, arg0_signed>(arg0);
+        this->template unpack_<base + arg0_size>(args...);
+    }
+
+    [[nodiscard]] T value_mask(uint64_t requested_size) const {
+        auto mask = std::numeric_limits<uint64_t>::max();
+        mask = mask >> (64ull - requested_size);
+        return static_cast<T>(mask);
+    }
 };
 
-template <uint64_t size, bool signed_, bool big_endian>
+template <int msb, int lsb, bool signed_>
 struct logic {
+    static auto constexpr size = util::abs_diff(msb, lsb) + 1;
+    constexpr static auto big_endian = msb > lsb;
     using T = typename util::get_holder_type<size, signed_>::type;
-    bits<size, signed_, big_endian> value;
+    bits<msb, lsb, signed_> value;
     // To reduce memory footprint, we use the following encoding scheme
     // if xz_mask is off, value is the actual integer value
     // if xz_mask is on, 0 in value means x and 1 means z
-    bits<size, false, big_endian> xz_mask;
+    bits<msb, lsb> xz_mask;
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -1257,9 +1263,9 @@ struct logic {
     /*
      * single bit
      */
-    inline logic<1> operator[](uint64_t idx) const {
+    inline logic operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
-            logic<1> r;
+            logic r;
             if (x_set(idx)) [[unlikely]] {
                 r.set_x(idx);
             } else if (z_set(idx)) [[unlikely]] {
@@ -1269,13 +1275,13 @@ struct logic {
             }
             return r;
         } else {
-            return logic<1>(false);
+            return logic(false);
         }
     }
 
     template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] inline logic<1> get() const {
-        logic<1> r;
+    requires(idx < size) [[nodiscard]] inline logic get() const {
+        logic r;
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
         } else if (this->template z_set<idx>()) [[unlikely]] {
@@ -1304,7 +1310,7 @@ struct logic {
         this->template unmask_bit<idx>();
     }
 
-    void set(uint64_t idx, const logic<1> &l) {
+    void set(uint64_t idx, const logic &l) {
         value.set(idx, l.value[idx]);
         xz_mask.set(idx, l.xz_mask[idx]);
     }
@@ -1348,17 +1354,15 @@ struct logic {
     /*
      * slices
      */
-    template <uint64_t a, uint64_t b>
-    requires(
-        util::max(a, b) <
-        size) constexpr logic<util::abs_diff(a, b) + 1, false, big_endian> inline slice() const {
+    template <int a, int b>
+    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice() const {
         if constexpr (size <= util::max(a, b)) {
-            // out of bound access
-            return logic<util::abs_diff(a, b) + 1, false, big_endian>(0);
+            // out of bound access will be X
+            return logic<util::abs_diff(a, b)>{};
         }
 
-        constexpr auto result_size = util::abs_diff(a, b) + 1u;
-        logic<result_size, false, big_endian> result;
+        auto constexpr target_size = util::abs_diff(a, b) + 1;
+        logic<target_size - 1, 0, false> result;
         result.value = value.template slice<a, b>();
         // copy over masks
         result.xz_mask = xz_mask.template slice<a, b>();
@@ -1370,9 +1374,9 @@ struct logic {
      * extend
      */
     template <uint64_t target_size>
-    requires(target_size >= size) logic<target_size, signed_, big_endian> extend()
+    requires(target_size >= size) logic<target_size, 0, signed_> extend()
     const {
-        logic<target_size, signed_, big_endian> result;
+        logic<target_size, 0, signed_> result;
         result.value = value.template extend<target_size>();
         result.xz_mask = xz_mask.template extend<target_size>();
         return result;
@@ -1381,10 +1385,10 @@ struct logic {
     /*
      * concatenation
      */
-    template <uint64_t arg0_size>
-    constexpr logic<size + arg0_size, false, big_endian> concat(const logic<arg0_size> &arg0) {
-        auto constexpr final_size = size + arg0_size;
-        auto res = logic<final_size, false, big_endian>();
+    template <int arg0_msb, int arg0_lsb, bool arg0_signed>
+    constexpr auto concat(const logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) {
+        auto constexpr final_size = size + logic<arg0_msb, arg0_lsb, arg0_signed>::size;
+        auto res = logic<final_size - 1, 0, signed_>();
         res.value = value.concat(arg0.value);
         // concat masks as well
         res.xz_mask = xz_mask.concat(arg0.xz_mask);
@@ -1418,7 +1422,7 @@ struct logic {
         return (!xz_mask.any_set()) && value.any_set();
     }
 
-    logic<1> operator!() const {
+    logic operator!() const {
         return xz_mask.any_set() ? x_() : (value.any_set() ? zero_() : one_());
     }
 
@@ -1426,19 +1430,22 @@ struct logic {
      * bitwise operators
      */
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    auto operator&(const logic<op_size, op_signed, op_big_endian> &op) const {
-        return this->template and_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template and_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    logic<size, signed_, big_endian> operator&(const logic<size, signed_, big_endian> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator&(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         // this is the truth table
         //   0 1 x z
         // 0 0 0 0 0
         // 1 0 1 x x
         // x 0 x x x
         // z 0 x x x
-        logic<size, signed_, big_endian> result;
+        logic<size - 1, 0, false> result;
         result.value = value & op.value;
         result.xz_mask = xz_mask & op.xz_mask;
         // we have taken care of the top left and bottom case
@@ -1458,36 +1465,40 @@ struct logic {
         return result;
     }
 
-    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    requires(target_size >= util::max(size, op_size))
-        [[nodiscard]] logic<target_size, signed_, big_endian> and_(
-            const logic<op_size, op_signed, op_big_endian> &op) const {
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> and_(const logic<op_msb, op_lsb, op_signed> &op)
+    const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l & r;
         return result;
     }
 
-    logic<size, signed_, big_endian> operator&=(const logic<size, signed_, big_endian> &op) {
+    template <int op_msb, int op_lsb, bool op_signed>
+    bits<size - 1, 0, signed_> &operator&=(const logic<op_msb, op_lsb, op_signed> &op) {
         auto const res = (*this) & op;
         this->value = res.value;
         this->xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    auto operator|(const logic<op_size, op_signed, op_big_endian> &op) const {
-        return this->template or_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template or_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    logic<size, signed_, big_endian> operator|(const logic<size, signed_, big_endian> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator|(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         // this is the truth table
         //   0 1 x z
         // 0 0 1 x x
         // 1 1 1 1 1
         // x x 1 x x
         // z x 1 x x
-        logic<size, signed_, big_endian> result;
+        logic<size - 1, 0, false> result;
         result.value = value | op.value;
         result.xz_mask = xz_mask | op.xz_mask;
         // we have taken care of the only top left case
@@ -1513,36 +1524,40 @@ struct logic {
         return result;
     }
 
-    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    requires(target_size >= util::max(size, op_size))
-        [[nodiscard]] logic<target_size, signed_, big_endian> or_(
-            const logic<op_size, op_signed, op_big_endian> &op) const {
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> or_(const logic<op_msb, op_lsb, op_signed> &op)
+    const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
         return result;
     }
 
-    logic<size, signed_, big_endian> operator|=(const logic<size, signed_, big_endian> &op) {
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<size - 1, 0, signed_> &operator|=(const logic<op_msb, op_lsb, op_signed> &op) {
         auto const res = (*this) | op;
         this->value = res.value;
         this->xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    auto operator^(const logic<op_size, op_signed, op_big_endian> &op) const {
-        return this->template xor_<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template xor_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    logic<size, signed_, big_endian> operator^(const logic<size, signed_, big_endian> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator^(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         // this is the truth table
         //   0 1 x z
         // 0 1 0 x x
         // 1 0 1 x x
         // x x x x x
         // z x x x x
-        logic<size, signed_, big_endian> result;
+        logic<size - 1, 0, false> result;
         result.value = value ^ op.value;
         result.xz_mask = xz_mask | op.xz_mask;
         // we have taken care of the only top left case
@@ -1557,28 +1572,29 @@ struct logic {
         return result;
     }
 
-    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    requires(target_size >= util::max(size, op_size))
-        [[nodiscard]] logic<target_size, signed_, big_endian> xor_(
-            const logic<op_size, op_signed, op_big_endian> &op) const {
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> xor_(const logic<op_msb, op_lsb, op_signed> &op)
+    const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
         return result;
     }
 
-    logic<size, signed_, big_endian> operator^=(const logic<size, signed_, big_endian> &op) {
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<size - 1, 0, signed_> &operator^=(const logic<op_msb, op_lsb, op_signed> &op) {
         auto const res = (*this) ^ op;
         this->value = res.value;
         this->xz_mask = res.xz_mask;
         return *this;
     }
 
-    logic<size, signed_, big_endian> operator~() const {
+    logic<size - 1> operator~() const {
         // this is the truth table
         //   0 1 x z
         //   1 0 x x
-        logic<size, signed_, big_endian> result;
+        logic<size - 1> result;
         result.value = ~value;
         result.xz_mask = xz_mask;
         // change anything has xz_mask on to x
@@ -1587,7 +1603,7 @@ struct logic {
     }
 
     // reduction
-    [[nodiscard]] logic<1> r_and() const {
+    [[nodiscard]] logic r_and() const {
         // zero trump everything
         // brute force way to compute
         for (auto i = 0u; i < size; i++) {
@@ -1601,9 +1617,9 @@ struct logic {
         return one_();
     }
 
-    [[nodiscard]] logic<1> r_nand() const { return !r_and(); }
+    [[nodiscard]] logic r_nand() const { return !r_and(); }
 
-    [[nodiscard]] logic<1> r_or() const {
+    [[nodiscard]] logic r_or() const {
         for (auto i = 0u; i < size; i++) {
             auto b = value[i];
             auto m = xz_mask[i];
@@ -1615,9 +1631,9 @@ struct logic {
         return zero_();
     }
 
-    [[nodiscard]] logic<1> r_nor() const { return !r_or(); }
+    [[nodiscard]] logic r_nor() const { return !r_or(); }
 
-    [[nodiscard]] logic<1> r_xor() const {
+    [[nodiscard]] logic r_xor() const {
         // this is the truth table
         //   0 1 x z
         // 0 1 0 x x
@@ -1631,12 +1647,11 @@ struct logic {
         return (zeros % 2) ? one_() : zero_();
     }
 
-    [[nodiscard]] logic<1> r_xnor() const { return !r_xor(); }
+    [[nodiscard]] logic r_xnor() const { return !r_xor(); }
 
-    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
-    logic<size, signed_, big_endian> operator>>(
-        const logic<op_size, op_signed_, op_big_endian> &amount) const {
-        logic<size, signed_, big_endian> res;
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator>>(const logic<op_msb, op_lsb, op_signed> &amount) const {
+        logic<size - 1, 0, signed_> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
             res.xz_mask.mask();
@@ -1647,19 +1662,17 @@ struct logic {
         return res;
     }
 
-    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
-    logic<size, signed_, big_endian> &operator>>=(
-        const logic<op_size, op_signed_, op_big_endian> &amount) {
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<size - 1, 0, signed_> &operator>>=(const logic<op_msb, op_lsb, op_signed> &amount) {
         auto res = (*this) >> amount;
         value = res.value;
         xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
-    logic<size, signed_, big_endian> operator<<(
-        const logic<op_size, op_signed_, op_big_endian> &amount) const {
-        logic<size, signed_, big_endian> res;
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator<<(const logic<op_msb, op_lsb, op_signed> &amount) const {
+        logic<size - 1, 0, signed_> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
             res.xz_mask.mask();
@@ -1670,19 +1683,17 @@ struct logic {
         return res;
     }
 
-    template <uint64_t op_size, bool op_signed_, bool op_big_endian>
-    logic<size, signed_, big_endian> &operator<<=(
-        const logic<op_size, op_signed_, op_big_endian> &amount) {
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<size - 1, 0, signed_> &operator<<=(const logic<op_msb, op_lsb, op_signed> &amount) {
         auto res = (*this) << amount;
         value = res.value;
         xz_mask = res.xz_mask;
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    logic<size, signed_, big_endian> ashr(
-        const logic<op_size, op_signed, op_big_endian> &amount) const {
-        logic<size, signed_, big_endian> res;
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto ashr(const logic<op_msb, op_lsb, op_signed> &amount) const {
+        logic<size - 1, 0, signed_> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
             res.xz_mask.mask();
@@ -1693,10 +1704,9 @@ struct logic {
         return res;
     }
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    logic<size, signed_, big_endian> ashl(
-        const logic<op_size, op_signed, op_big_endian> &amount) const {
-        logic<size, signed_, big_endian> res;
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto ashl(const logic<op_msb, op_lsb, op_signed> &amount) const {
+        logic<size - 1, 0, signed_> res;
         if (amount.xz_mask.any_set() || xz_mask.any_set()) [[unlikely]] {
             // return all x
             res.xz_mask.mask();
@@ -1707,8 +1717,8 @@ struct logic {
         return res;
     }
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    logic<1> operator==(const logic<op_size, op_signed, op_big_endian> &target) const {
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic operator==(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value == target.value ? one_() : zero_();
     }
@@ -1717,23 +1727,27 @@ struct logic {
      * arithmetic operators: + - * / %
      */
 
-    template <uint64_t op_size, bool op_signed, bool op_big_endian>
-    auto operator+(const logic<op_size, op_signed, op_big_endian> &op) const {
-        return this->template add<util::max(size, op_size), op_size, op_signed, op_big_endian>(op);
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator+(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
-    logic<size, signed_, big_endian> operator+(const logic<size, signed_, big_endian> &op) const {
+    template <int op_lsb, bool op_signed>
+    auto operator+(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
         if (xz_mask.any_set() || op.xz_mask.any_set()) [[unlikely]] {
-            return logic<size, signed_, big_endian>();
+            return logic<size - 1, 0, signed_>();
         } else {
-            return logic<size, signed_, big_endian>{value + op.value};
+            return logic<size - 1, 0, signed_>{value + op.value};
         }
     }
 
-    template <uint64_t target_size, uint64_t op_size, bool op_signed, bool op_big_endian>
-    requires(target_size >= util::max(size, op_size))
-        [[nodiscard]] logic<target_size, signed_, big_endian> add(
-            const logic<op_size, op_signed, op_big_endian> &op) const {
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> add(const bits<op_msb, op_lsb, op_signed> &op)
+    const {
+        // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l + r;
@@ -1747,14 +1761,14 @@ struct logic {
     constexpr logic() { xz_mask.mask(); }
 
     explicit constexpr logic(T value) requires(size <= big_num_threshold)
-        : value(bits<size, signed_, big_endian>(value)) {}
+        : value(bits<msb, lsb, signed_>(value)) {}
 
     template <typename K>
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bits<size, signed_, big_endian>(value)) {}
+        : value(bits<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bits<size, signed_, big_endian>(v)) {
+    explicit logic(std::string_view v) : value(bits<msb, lsb, signed_>(v)) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
@@ -1774,7 +1788,7 @@ struct logic {
     }
 
     // conversion from bits to logic
-    constexpr explicit logic(bits<size, signed_, big_endian> &&b) : value(std::move(b)) {}
+    constexpr explicit logic(bits<msb, lsb, signed_> &&b) : value(std::move(b)) {}
 
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
@@ -1787,36 +1801,41 @@ private:
     /*
      * unpacking, which is basically slicing as syntax sugars
      */
-    template <uint64_t base, uint64_t arg0_size, bool arg0_signed>
-    requires(base < size) void unpack_(logic<arg0_size, arg0_signed, big_endian> &target) const {
+    template <int base, int arg0_msb, int arg0_lsb, int arg0_signed>
+    requires(base < size) void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+        auto constexpr arg0_size = logic<arg0_msb, arg0_lsb, arg0_signed>::size;
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
-        target.value = value.template slice<base, upper_bound>();
-        target.xz_mask = xz_mask.template slice<base, upper_bound>();
+        arg0.value = this->template slice<base, upper_bound>();
     }
 
-    template <uint64_t base = 0, uint64_t arg0_size, bool arg0_signed, typename... Ts>
-    [[maybe_unused]] auto unpack_(logic<arg0_size, arg0_signed, big_endian> &logic0,
-                                  Ts &...args) const {
-        this->template unpack_<base, arg0_size>(logic0);
+    template <int base = lsb, int arg0_msb, int arg0_lsb, bool arg0_signed, typename... Ts>
+    [[maybe_unused]] auto unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
+        auto constexpr arg0_size = logic<arg0_msb, arg0_lsb, arg0_signed>::size;
+        this->template unpack_<base, arg0_msb, arg0_lsb, arg0_signed>(arg0);
         this->template unpack_<base + arg0_size>(args...);
     }
 
-    static constexpr logic<1> x_() {
-        logic<1> r;
+    template <int>
+    [[maybe_unused]] void unpack_() const {
+        // noop to keep gcc happy
+    }
+
+    static constexpr logic x_() {
+        logic r;
         r.value.value = false;
         r.xz_mask.value = true;
         return r;
     }
 
-    static constexpr logic<1> one_() {
-        logic<1> r;
+    static constexpr logic one_() {
+        logic r;
         r.value.value = true;
         r.xz_mask.value = false;
         return r;
     }
 
-    static constexpr logic<1> zero_() {
-        logic<1> r;
+    static constexpr logic zero_() {
+        logic r;
         r.value.value = false;
         r.xz_mask.value = false;
         return r;

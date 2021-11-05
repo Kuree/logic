@@ -4,36 +4,36 @@
 #include "logic/logic.hh"
 
 TEST(logic, size) {  // NOLINT
-    EXPECT_EQ(sizeof(logic::logic<4>), 1 * 2);
-    EXPECT_EQ(sizeof(logic::logic<8>), 1 * 2);
-    EXPECT_EQ(sizeof(logic::logic<64>), 8 * 2);
-    EXPECT_EQ(sizeof(logic::logic<100>), 16 * 2);
-    EXPECT_EQ(sizeof(logic::logic<128>), 16 * 2);
+    EXPECT_EQ(sizeof(logic::logic<4 - 1, 0>), 1 * 2);
+    EXPECT_EQ(sizeof(logic::logic<8 - 1, 0>), 1 * 2);
+    EXPECT_EQ(sizeof(logic::logic<64 - 1, 0>), 8 * 2);
+    EXPECT_EQ(sizeof(logic::logic<100 - 1, 0>), 16 * 2);
+    EXPECT_EQ(sizeof(logic::logic<128 - 1, 0>), 16 * 2);
 }
 
 TEST(logic, init) {  // NOLINT
     {
         // uin8_t holder
-        logic::logic<4> l;
+        logic::logic<3 - 1, 0> l;
         auto s = l.str();
         EXPECT_EQ(s, "xxxx");
     }
     {
         // uint16_t holder
-        logic::logic<15> l;
+        logic::logic<15 - 1, 0> l;
         auto s = l.str();
         EXPECT_EQ(s, "xxxxxxxxxxxxxxx");
     }
     {
         // uint32_t holder
-        logic::logic<30> l(42);
+        logic::logic<30 - 1, 0> l(42);
         auto s = l.str();
         EXPECT_EQ(s, "000000000000000000000000101010");
     }
 
     {
         // uint64_t holder
-        logic::logic<64> l(std::numeric_limits<uint64_t>::max());
+        logic::logic<64 - 1, 0> l(std::numeric_limits<uint64_t>::max());
         auto s = l.str();
         std::stringstream ss;
         for (auto i = 0; i < 64; i++) ss << '1';
@@ -43,7 +43,7 @@ TEST(logic, init) {  // NOLINT
     {
         // uint64_t holder with str initializer
         constexpr std::string_view v = "xx1010";
-        logic::logic<40> l(v);
+        logic::logic<40 - 1, 0> l(v);
         auto s = l.str();
         std::stringstream ss;
         for (auto i = 0u; i < 40u - v.size(); i++) ss << '0';
@@ -55,7 +55,7 @@ TEST(logic, init) {  // NOLINT
         // big number holder
         // uint64_t holder with str initializer
         constexpr std::string_view v = "xx1010";
-        logic::logic<128> l(v);
+        logic::logic<128 - 1, 0> l(v);
         auto s = l.str();
         std::stringstream ss;
         for (auto i = 0u; i < 128u - v.size(); i++) ss << '0';
@@ -67,7 +67,7 @@ TEST(logic, init) {  // NOLINT
 TEST(logic, slice) {  // NOLINT
     {
         // integer holder
-        logic::logic<40> l(42);
+        logic::logic<40 - 1, 0> l(42);
         auto s = l.slice<3, 2>();
         EXPECT_EQ(s.str(), "10");
     }
@@ -89,7 +89,7 @@ TEST(logic, slice) {  // NOLINT
         auto constexpr ref = "1011";
         ss << ref;
         for (auto i = 0; i < 100; i++) ss << '1';
-        logic::logic<120> l(ss.str());
+        logic::logic<120 - 1, 0> l(ss.str());
         auto s = l.slice<103, 42>();
         ss = std::stringstream();
         ss << ref;
@@ -109,7 +109,7 @@ TEST(logic, literal) {  // NOLINT
 
 TEST(logic, concat) {  // NOLINT
     {
-        logic::logic<4> a(1);
+        logic::logic<4 - 1, 0> a(1);
         auto b = a.concat(logic::logic<4>(2), logic::logic<4>(3));
         EXPECT_EQ("000100100011", b.str());
     }
@@ -117,7 +117,7 @@ TEST(logic, concat) {  // NOLINT
 
 TEST(logic, mask) {  // NOLINT
     {
-        logic::logic<12> a("xx00zz");
+        logic::logic<12 - 1, 0> a("xx00zz");
         EXPECT_TRUE(a.xz_mask.any_set());
         EXPECT_NE(a.value.value, 0);
     }
@@ -125,8 +125,8 @@ TEST(logic, mask) {  // NOLINT
 
 TEST(logic, unpack) {  // NOLINT
     {
-        logic::logic<4> a, b, c;
-        auto d = logic::logic<12>("000100100011");
+        logic::logic<4 - 1, 0> a, b, c;
+        auto d = logic::logic<12 - 1, 0>("000100100011");
         d.unpack(a, b, c);
         EXPECT_EQ("0001", a.str());
         EXPECT_EQ("0010", b.str());
@@ -136,7 +136,7 @@ TEST(logic, unpack) {  // NOLINT
 
 TEST(logic, bool_) {  // NOLINT
     {
-        logic::logic<4> a{"010x"};
+        logic::logic<4 - 1, 0> a{"010x"};
         if (a) {
             FAIL();
         }
@@ -145,7 +145,7 @@ TEST(logic, bool_) {  // NOLINT
     }
 
     {
-        logic::logic<4> a{"0100"};
+        logic::logic<4 - 1, 0> a{"0100"};
         if (!a) {
             FAIL();
         }
@@ -154,8 +154,8 @@ TEST(logic, bool_) {  // NOLINT
     }
 
     {
-        logic::logic<4> a{"0100"};
-        logic::logic<4> b{"010z"};
+        logic::logic<4 - 1, 0> a{"0100"};
+        logic::logic<4 - 1, 0> b{"010z"};
         if (a && b) {
             FAIL();
         }
@@ -167,31 +167,31 @@ TEST(logic, bool_) {  // NOLINT
 TEST(logic, and_) {  // NOLINT
     using namespace std::literals;
     {
-        logic::logic<1> a{"0"}, b{"1"};
+        logic::logic a{"0"}, b{"1"};
         auto c = a & b;
         EXPECT_EQ("0", c.str());
     }
 
     {
-        logic::logic<1> a{"0"}, b{"x"};
+        logic::logic a{"0"}, b{"x"};
         auto c = a & b;
         EXPECT_EQ("0", c.str());
     }
 
     {
-        logic::logic<1> a{"z"}, b{"x"};
+        logic::logic a{"z"}, b{"x"};
         auto c = a & b;
         EXPECT_EQ("x", c.str());
     }
 
     {
-        logic::logic<1> a{"1"}, b{"x"};
+        logic::logic a{"1"}, b{"x"};
         auto c = a & b;
         EXPECT_EQ("x", c.str());
     }
 
     {
-        logic::logic<1> a{"1"}, b{"z"};
+        logic::logic a{"1"}, b{"z"};
         auto c = a & b;
         EXPECT_EQ("x", c.str());
     }
@@ -200,9 +200,9 @@ TEST(logic, and_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<140> b{s};
+        logic::logic<140 - 1, 0> b{s};
         auto c = a & b;
         ss = {};
         for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
@@ -216,9 +216,9 @@ TEST(logic, and_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<40> b{s};
+        logic::logic<40 - 1, 0> b{s};
         auto c = a & b;
         ss = {};
         for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
@@ -232,31 +232,31 @@ TEST(logic, and_) {  // NOLINT
 TEST(logic, or_) {  // NOLINT
     using namespace std::literals;
     {
-        logic::logic<1> a{"0"}, b{"1"};
+        logic::logic a{"0"}, b{"1"};
         auto c = a | b;
         EXPECT_EQ("1", c.str());
     }
 
     {
-        logic::logic<1> a{"0"}, b{"0"};
+        logic::logic a{"0"}, b{"0"};
         auto c = a | b;
         EXPECT_EQ("0", c.str());
     }
 
     {
-        logic::logic<1> a{"0"}, b{"x"};
+        logic::logic a{"0"}, b{"x"};
         auto c = a | b;
         EXPECT_EQ("x", c.str());
     }
 
     {
-        logic::logic<1> a{"1"}, b{"x"};
+        logic::logic a{"1"}, b{"x"};
         auto c = a | b;
         EXPECT_EQ("1", c.str());
     }
 
     {
-        logic::logic<1> a{"z"}, b{"x"};
+        logic::logic a{"z"}, b{"x"};
         auto c = a | b;
         EXPECT_EQ("x", c.str());
     }
@@ -265,9 +265,9 @@ TEST(logic, or_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '0';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<140> b{s};
+        logic::logic<140 - 1, 0> b{s};
         auto c = a | b;
         ss = {};
         for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
@@ -281,9 +281,9 @@ TEST(logic, or_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '0';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<40> b{s};
+        logic::logic<40 - 1, 0> b{s};
         auto c = a | b;
         ss = {};
         for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
@@ -297,31 +297,31 @@ TEST(logic, or_) {  // NOLINT
 TEST(logic, xor_) {  // NOLINT
     using namespace std::literals;
     {
-        logic::logic<1> a{"0"}, b{"1"};
+        logic::logic a{"0"}, b{"1"};
         auto c = a ^ b;
         EXPECT_EQ("1", c.str());
     }
 
     {
-        logic::logic<1> a{"0"}, b{"0"};
+        logic::logic a{"0"}, b{"0"};
         auto c = a ^ b;
         EXPECT_EQ("0", c.str());
     }
 
     {
-        logic::logic<1> a{"0"}, b{"x"};
+        logic::logic a{"0"}, b{"x"};
         auto c = a ^ b;
         EXPECT_EQ("x", c.str());
     }
 
     {
-        logic::logic<1> a{"1"}, b{"x"};
+        logic::logic a{"1"}, b{"x"};
         auto c = a ^ b;
         EXPECT_EQ("x", c.str());
     }
 
     {
-        logic::logic<1> a{"z"}, b{"x"};
+        logic::logic a{"z"}, b{"x"};
         auto c = a ^ b;
         EXPECT_EQ("x", c.str());
     }
@@ -330,9 +330,9 @@ TEST(logic, xor_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '0';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<140> b{s};
+        logic::logic<140 - 1, 0> b{s};
         auto c = a ^ b;
         ss = {};
         for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
@@ -346,9 +346,9 @@ TEST(logic, xor_) {  // NOLINT
     {
         std::stringstream ss;
         for (auto i = 0; i < 120; i++) ss << '0';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         auto const s = "1010101010"sv;
-        logic::logic<40> b{s};
+        logic::logic<40 - 1, 0> b{s};
         auto c = a ^ b;
         ss = {};
         for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
@@ -361,25 +361,25 @@ TEST(logic, xor_) {  // NOLINT
 
 TEST(logic, not_) {  // NOLINT
     {
-        logic::logic<1> a{"0"};
+        logic::logic a{"0"};
         auto b = ~a;
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<1> a{"1"};
+        logic::logic a{"1"};
         auto b = ~a;
         EXPECT_EQ("0", b.str());
     }
 
     {
-        logic::logic<1> a{"x"};
+        logic::logic a{"x"};
         auto b = ~a;
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<1> a{"z"};
+        logic::logic a{"z"};
         auto b = ~a;
         EXPECT_EQ("x", b.str());
     }
@@ -387,25 +387,25 @@ TEST(logic, not_) {  // NOLINT
 
 TEST(logic, r_and) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_and();
         EXPECT_EQ("0", b.str());
     }
 
     {
-        logic::logic<4> a{"1111"};
+        logic::logic<4 - 1, 0> a{"1111"};
         auto b = a.r_and();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"x111"};
+        logic::logic<4 - 1, 0> a{"x111"};
         auto b = a.r_and();
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<4> a{"xz11"};
+        logic::logic<4 - 1, 0> a{"xz11"};
         auto b = a.r_and();
         EXPECT_EQ("x", b.str());
     }
@@ -413,25 +413,25 @@ TEST(logic, r_and) {  // NOLINT
 
 TEST(logic, r_nand) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_nand();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"x001"};
+        logic::logic<4 - 1, 0> a{"x001"};
         auto b = a.r_nand();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"z001"};
+        logic::logic<4 - 1, 0> a{"z001"};
         auto b = a.r_nand();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"xz11"};
+        logic::logic<4 - 1, 0> a{"xz11"};
         auto b = a.r_nand();
         EXPECT_EQ("x", b.str());
     }
@@ -439,19 +439,19 @@ TEST(logic, r_nand) {  // NOLINT
 
 TEST(logic, r_or) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_or();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"z000"};
+        logic::logic<4 - 1, 0> a{"z000"};
         auto b = a.r_or();
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<4> a{"x000"};
+        logic::logic<4 - 1, 0> a{"x000"};
         auto b = a.r_or();
         EXPECT_EQ("x", b.str());
     }
@@ -459,19 +459,19 @@ TEST(logic, r_or) {  // NOLINT
 
 TEST(logic, r_nor) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_nor();
         EXPECT_EQ("0", b.str());
     }
 
     {
-        logic::logic<4> a{"z000"};
+        logic::logic<4 - 1, 0> a{"z000"};
         auto b = a.r_nor();
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<4> a{"x001"};
+        logic::logic<4 - 1, 0> a{"x001"};
         auto b = a.r_nor();
         EXPECT_EQ("0", b.str());
     }
@@ -479,19 +479,19 @@ TEST(logic, r_nor) {  // NOLINT
 
 TEST(logic, r_xor) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_xor();
         EXPECT_EQ("0", b.str());
     }
 
     {
-        logic::logic<4> a{"z001"};
+        logic::logic<4 - 1, 0> a{"z001"};
         auto b = a.r_xor();
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<4> a{"x001"};
+        logic::logic<4 - 1, 0> a{"x001"};
         auto b = a.r_xor();
         EXPECT_EQ("x", b.str());
     }
@@ -499,19 +499,19 @@ TEST(logic, r_xor) {  // NOLINT
 
 TEST(logic, r_xnor) {  // NOLINT
     {
-        logic::logic<4> a{"1001"};
+        logic::logic<4 - 1, 0> a{"1001"};
         auto b = a.r_xnor();
         EXPECT_EQ("1", b.str());
     }
 
     {
-        logic::logic<4> a{"z001"};
+        logic::logic<4 - 1, 0> a{"z001"};
         auto b = a.r_xnor();
         EXPECT_EQ("x", b.str());
     }
 
     {
-        logic::logic<4> a{"x001"};
+        logic::logic<4 - 1, 0> a{"x001"};
         auto b = a.r_xnor();
         EXPECT_EQ("x", b.str());
     }
@@ -522,14 +522,14 @@ TEST(logic, bitwise_shift_left) {  // NOLINT
         // big number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
-        logic::logic<100> b{"1111111111111111"};
+        logic::logic<120 - 1, 0> a{ss.str()};
+        logic::logic<100 - 1, 0> b{"1111111111111111"};
 
         auto c = a << b;
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100>{"111"};
+        b = logic::logic<100 - 1, 0>{"111"};
         c = a << b;
         ss = {};
         for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
@@ -539,17 +539,17 @@ TEST(logic, bitwise_shift_left) {  // NOLINT
 
     {
         // shifts with signed
-        logic::logic<32, true> a{-120};
-        logic::logic<2> b{2};
+        logic::logic<32 - 1, 0, true> a{-120};
+        logic::logic<2 - 1, 0> b{2};
         auto c = a << b;
-        logic::logic<32, true> ref{-120 * 4};
+        logic::logic<32 - 1, 0, true> ref{-120 * 4};
         EXPECT_EQ(c.str(), ref.str());
     }
 
     {
         // normal number shifting
-        logic::logic<20> a{42};
-        logic::logic<60> b{8};
+        logic::logic<20 - 1, 0> a{42};
+        logic::logic<60 - 1, 0> b{8};
         auto c = a << b;
         EXPECT_EQ(c.value.value, 42 << 8);
     }
@@ -560,14 +560,14 @@ TEST(logic, bitwise_shift_right) {  // NOLINT
         // big number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
-        logic::logic<100> b{"1111111111111111"};
+        logic::logic<120 - 1, 0> a{ss.str()};
+        logic::logic<100 - 1, 0> b{"1111111111111111"};
 
         auto c = a >> b;
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100>{"111"};
+        b = logic::logic<100 - 1, 0>{"111"};
         c = a >> b;
         ss = {};
         for (auto i = 0; i < 7; i++) ss << '0';
@@ -577,17 +577,17 @@ TEST(logic, bitwise_shift_right) {  // NOLINT
 
     {
         // shifts with signed
-        logic::logic<32, true> a{-120};
+        logic::logic<32 - 1, 0, true> a{-120};
         logic::logic<2> b{2};
         auto c = a >> b;
-        logic::logic<32, false> ref{static_cast<uint32_t>(-120) >> 2};
+        logic::logic<32 - 1, 0, false> ref{static_cast<uint32_t>(-120) >> 2};
         EXPECT_EQ(c.str(), ref.str());
     }
 
     {
         // normal number shifting
-        logic::logic<20> a{42};
-        logic::logic<60> b{8};
+        logic::logic<20 - 1, 0> a{42};
+        logic::logic<60 - 1, 0> b{8};
         auto c = a >> b;
         EXPECT_EQ(c.value.value, 42 >> 8);
     }
@@ -598,14 +598,14 @@ TEST(logic, arithmetic_shift_left) {  // NOLINT
         // big number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
-        logic::logic<100> b{"1111111111111111"};
+        logic::logic<120 - 1, 0> a{ss.str()};
+        logic::logic<100 - 1, 0> b{"1111111111111111"};
 
         auto c = a.ashl(b);
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100>{"111"};
+        b = logic::logic<100 - 1, 0>{"111"};
         c = a.ashl(b);
         ss = {};
         for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
@@ -615,17 +615,17 @@ TEST(logic, arithmetic_shift_left) {  // NOLINT
 
     {
         // shifts with signed
-        logic::logic<32, true> a{-120};
+        logic::logic<32 - 1, 0, true> a{-120};
         logic::logic<2> b{2};
         auto c = a.ashl(b);
-        logic::logic<32, true> ref{-120 * 4};
+        logic::logic<32 - 1, 0, true> ref{-120 * 4};
         EXPECT_EQ(c.str(), ref.str());
     }
 
     {
         // normal number shifting
-        logic::logic<20> a{42};
-        logic::logic<60> b{8};
+        logic::logic<20 - 1, 0> a{42};
+        logic::logic<60 - 1, 0> b{8};
         auto c = a.ashl(b);
         EXPECT_EQ(c.value.value, 42 << 8);
     }
@@ -636,14 +636,14 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
         // big number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
-        logic::logic<100> b{"1111111111111111"};
+        logic::logic<120 - 1, 0> a{ss.str()};
+        logic::logic<100 - 1, 0> b{"1111111111111111"};
 
         auto c = a.ashr(b);
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100>{"111"};
+        b = logic::logic<100 - 1, 0>{"111"};
         c = a >> b;
         ss = {};
         for (auto i = 0; i < 7; i++) ss << '0';
@@ -653,10 +653,10 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
 
     {
         // shifts with signed
-        logic::logic<32, true> a{-120};
+        logic::logic<32 - 1, 0, true> a{-120};
         logic::logic<2> b{2};
         auto c = a.ashr(b);
-        logic::logic<32, true> ref{-120 >> 2};
+        logic::logic<32 - 1, 0, true> ref{-120 >> 2};
         EXPECT_EQ(c.str(), ref.str());
     }
 
@@ -665,8 +665,8 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
         std::stringstream ss;
         ss << '1';
         for (auto i = 0; i < (420 - 1); i++) ss << '0';
-        logic::logic<420, true> a{ss.str()};
-        logic::logic<120> b{42ul};
+        logic::logic<420 - 1, 0, true> a{ss.str()};
+        logic::logic<120 - 1, 0> b{42ul};
         auto c = a.ashr(b);
         ss = {};
         for (auto i = 0; i < 42; i++) ss << '1';
@@ -677,23 +677,23 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
 
 TEST(logic, equal) {  // NOLINT
     {
-        logic::logic<1> a{true};
+        logic::logic a{true};
         auto b = a == logic::logic<10>{1u};
         EXPECT_EQ(b.str(), "1");
     }
 
     {
         // with big number
-        logic::logic<120> a{std::numeric_limits<uint64_t>::max() - 1};
-        logic::logic<420> b{std::numeric_limits<uint64_t>::max()};
+        logic::logic<120 - 1, 0> a{std::numeric_limits<uint64_t>::max() - 1};
+        logic::logic<420 - 1, 0> b{std::numeric_limits<uint64_t>::max()};
         auto c = a == b;
         EXPECT_EQ(c.str(), "0");
     }
 
     {
         // with x and z
-        logic::logic<1024> a{"x"};
-        logic::logic<20> b{12};
+        logic::logic<1024 - 1, 0> a{"x"};
+        logic::logic<20 - 1, 0> b{12};
         auto c = a == b;
         EXPECT_EQ(c.str(), "x");
     }
@@ -704,10 +704,10 @@ TEST(logic, add) {  // NOLINT
         // big number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         ss = {};
         for (uint64_t i = 0; i < 100; i++) ss << '1';
-        logic::logic<100> b{ss.str()};
+        logic::logic<100 - 1, 0> b{ss.str()};
 
         auto c = a + b;
         ss = {};
@@ -715,7 +715,7 @@ TEST(logic, add) {  // NOLINT
         for (uint64_t i = 0; i < (100 - 1); i++) ss << '1';
         ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        c  = b + a;
+        c = b + a;
         EXPECT_EQ(ss.str(), c.str());
     }
 
@@ -723,10 +723,10 @@ TEST(logic, add) {  // NOLINT
         // big number with small number
         std::stringstream ss;
         for (uint64_t i = 0; i < 120; i++) ss << '1';
-        logic::logic<120> a{ss.str()};
+        logic::logic<120 - 1, 0> a{ss.str()};
         ss = {};
         for (uint64_t i = 0; i < 40; i++) ss << '1';
-        logic::logic<40> b{ss.str()};
+        logic::logic<40 - 1, 0> b{ss.str()};
         auto c = a + b;
         ss = {};
 
@@ -740,8 +740,8 @@ TEST(logic, add) {  // NOLINT
 
     {
         // small numbers
-        logic::logic<20> a{100};
-        logic::logic<30> b{10000};
+        logic::logic<20 - 1, 0> a{100};
+        logic::logic<30 - 1, 0> b{10000};
 
         auto c = a + b;
         std::string_view ref = "10011101110100";
