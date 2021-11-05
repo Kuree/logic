@@ -14,7 +14,7 @@ TEST(logic, size) {  // NOLINT
 TEST(logic, init) {  // NOLINT
     {
         // uin8_t holder
-        logic::logic<3 - 1, 0> l;
+        logic::logic<4 - 1, 0> l;
         auto s = l.str();
         EXPECT_EQ(s, "xxxx");
     }
@@ -110,7 +110,7 @@ TEST(logic, literal) {  // NOLINT
 TEST(logic, concat) {  // NOLINT
     {
         logic::logic<4 - 1, 0> a(1);
-        auto b = a.concat(logic::logic<4>(2), logic::logic<4>(3));
+        auto b = a.concat(logic::logic<4 - 1, 0>(2), logic::logic<4 - 1, 0>(3));
         EXPECT_EQ("000100100011", b.str());
     }
 }
@@ -654,7 +654,7 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
     {
         // shifts with signed
         logic::logic<32 - 1, 0, true> a{-120};
-        logic::logic<2> b{2};
+        logic::logic<2 - 1, 0> b{2};
         auto c = a.ashr(b);
         logic::logic<32 - 1, 0, true> ref{-120 >> 2};
         EXPECT_EQ(c.str(), ref.str());
