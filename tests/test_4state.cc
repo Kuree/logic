@@ -750,4 +750,73 @@ TEST(logic, add) {  // NOLINT
         ss << ref;
         EXPECT_EQ(c.str(), ss.str());
     }
+
+    {
+        // signed big numbers
+    }
+}
+
+TEST(logic, minus) {  // NOLINT
+    using namespace logic::literals;
+    {
+        // big number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120 - 1, 0> a{ss.str()};
+        ss = {};
+        for (uint64_t i = 0; i < 100; i++) ss << '1';
+        logic::logic<100 - 1, 0> b{ss.str()};
+
+        auto c = a - b;
+        ss = {};
+        for (uint64_t i = 0; i < 20; i++) ss << '1';
+        for (uint64_t i = 0; i < 100 ; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+        c = b - a;
+        ss = {};
+        for (uint64_t i = 0; i < 19; i++) ss << '0';
+        ss << '1';
+        for (uint64_t i = 0; i < 100 ; i++) ss << '0';
+        EXPECT_EQ(ss.str(), c.str());
+    }
+
+
+    {
+        // big number with small number
+        std::stringstream ss;
+        for (uint64_t i = 0; i < 120; i++) ss << '1';
+        logic::logic<120 - 1, 0> a{ss.str()};
+        ss = {};
+        for (uint64_t i = 0; i < 40; i++) ss << '1';
+        logic::logic<40 - 1, 0> b{ss.str()};
+        auto c = a - b;
+        ss = {};
+
+        for (auto i = 0; i < 80; i++) ss << '1';
+        for (auto i = 0; i < 40; i++) ss << '0';
+        EXPECT_EQ(c.str(), ss.str());
+    }
+
+    {
+        // small numbers
+        logic::logic<40 - 1, 0> a{600000};
+        logic::logic<30 - 1, 0> b{10000};
+
+        auto c = a - b;
+        std::string_view ref = "10010000000010110000";
+        std::stringstream ss;
+        for (auto i = 0u; i < (40 - ref.size()); i++) ss << '0';
+        ss << ref;
+        EXPECT_EQ(c.str(), ss.str());
+    }
+
+    {
+        // signed big numbers
+        logic::logic<100 - 1, 0> a{0u};
+        logic::logic<30, 0, true> b{-42};
+        auto c = b.extend<100>() << 20_logic;
+        auto d = a - c;
+        auto ref = logic::logic<100 - 1>(42u << 20);
+        EXPECT_EQ(ref.str(), d.str());
+    }
 }

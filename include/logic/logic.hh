@@ -184,6 +184,8 @@ public:
         }
     }
 
+    [[nodiscard]] bool negative() const requires(signed_) { return this->operator[](size - 1); }
+
     template <uint64_t a, uint64_t b>
     requires(util::max(a, b) < size) big_num<util::abs_diff(a, b) + 1, false>
     inline slice() const {
@@ -210,7 +212,7 @@ public:
             // based on the sign, need to fill out leading ones
             if constexpr (signed_) {
                 for (uint64_t i = size; i < op_size; i++) {
-                    set<i>(true);
+                    result.set(i, true);
                 }
             }
             return result;
@@ -245,7 +247,7 @@ public:
     void mask_off() {
         // mask off bits that's excessive bits
         auto constexpr amount = s * 64 - size;
-        auto constexpr mask = std::numeric_limits<uint64_t>::max() >> (64 - amount);
+        auto constexpr mask = std::numeric_limits<uint64_t>::max() >> amount;
         values[s - 1] &= mask;
     }
 
@@ -274,12 +276,13 @@ public:
     // interim results shall take the size of the largest operand (in case of an
     // assignment, this also includes the left-hand side).
     // Care has to be taken to prevent loss of a significant bit during expression evaluation.
-    template <uint64_t op_size, bool op_signed>
+    template <uint64_t op_size, bool op_signed> requires (op_size != size)
     auto operator&(const big_num<op_size, op_signed> &op) const {
         return this->template and_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
-    big_num<size, signed_> operator&(const big_num<size, signed_> &op) const {
+    template <bool op_signed>
+    big_num<size, signed_> operator&(const big_num<size, op_signed> &op) const {
         big_num<size, signed_> result;
         for (uint i = 0; i < s; i++) {
             result.values[i] = values[i] & op.values[i];
@@ -311,12 +314,13 @@ public:
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed>
+    template <uint64_t op_size, bool op_signed> requires (op_size != size)
     auto operator^(const big_num<op_size, op_signed> &op) const {
         return this->template xor_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
-    big_num<size, signed_> operator^(const big_num<size, signed_> &op) const {
+    template <bool op_signed>
+    big_num<size, signed_> operator^(const big_num<size, op_signed> &op) const {
         big_num<size, signed_> result;
         for (uint i = 0; i < s; i++) {
             result.values[i] = values[i] ^ op.values[i];
@@ -352,7 +356,8 @@ public:
         return this->template or_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
-    big_num<size, signed_> operator|(const big_num<size, signed_> &op) const {
+    template <bool op_signed>
+    big_num<size, signed_> operator|(const big_num<size, op_signed> &op) const {
         big_num<size, signed_> result;
         for (uint i = 0; i < s; i++) {
             result.values[i] = values[i] | op.values[i];
@@ -465,15 +470,13 @@ public:
             big_num<size, signed_> res;
             // notice that we need size - 1 since the top bit is always signed bit
             if (amount > (size - 1)) [[unlikely]] {
-                if constexpr (signed_) {
-                    if (is_negative()) [[unlikely]] {
-                        res.mask();
-                    }
+                if (negative()) [[unlikely]] {
+                    res.mask();
                 }
                 return res;
             }
             // set high bits
-            bool negative = is_negative();
+            bool negative = this->negative();
             for (uint64_t i = 0; i < amount; i++) {
                 auto dst = size - i - 1;
                 res.set(dst, negative);
@@ -498,7 +501,7 @@ public:
         for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) {
                 if constexpr (signed_) {
-                    if (is_negative()) [[unlikely]] {
+                    if (negative()) [[unlikely]] {
                         res.mask();
                     }
                 }
@@ -550,12 +553,13 @@ public:
      * arithmetic operators: + - * / %
      */
 
-    template <uint64_t op_size, bool op_signed>
+    template <uint64_t op_size, bool op_signed>  requires (op_size != size)
     auto operator+(const big_num<op_size, op_signed> &op) const {
         return this->template add<util::max(size, op_size), op_size, op_signed>(op);
     }
 
-    big_num<size, signed_> operator+(const big_num<size, signed_> &op) const {
+    template <bool op_signed>
+    big_num<size, signed_> operator+(const big_num<size, op_signed> &op) const {
         big_num<size, signed_> result;
         uint64_t carry = 0;
         for (auto i = 0u; i < s; i++) {
@@ -575,6 +579,40 @@ public:
         auto r = op.template extend<target_size>();
         auto result = l + r;
         return result;
+    }
+
+    template <uint64_t op_size, bool op_signed> requires (op_size != size)
+    auto operator-(const big_num<op_size, op_signed> &op) const {
+        return this->template minus<util::max(size, op_size), op_size, op_signed>(op);
+    }
+
+    template <bool op_signed>
+    big_num<size, signed_> operator-(const big_num<size, op_signed> &op) const {
+        auto neg = op.negate();
+        return (*this) + neg;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed>
+    requires(target_size >= util::max(size, op_size)) big_num<target_size, signed_> minus(
+        const big_num<op_size, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l - r;
+        return result;
+    }
+
+    [[nodiscard]] big_num<size, signed_> negate() const {
+        // 2's complement
+        big_num<size, signed_> result = ~(*this);
+        constexpr static auto v = big_num<size>(1ul);
+        result = result + v;
+        return result;
+    }
+
+    big_num<size, signed_> operator-() const {
+        return negate();
     }
 
     /*
@@ -617,16 +655,22 @@ public:
 
     template <typename T>
     requires std::is_arithmetic_v<T>
-    explicit big_num(T v) : values({v}) {}
+    explicit constexpr big_num(T v) : values({v}) {
+        if constexpr (signed_) {
+            if (v < 0) {
+                for (auto i = 1u; i < s; i++) {
+                    values[i] = std::numeric_limits<big_num_holder_type>::max();
+                }
+                mask_off();
+            }
+        }
+    }
 
     // set values to 0 when initialized
-    big_num() { std::fill(values.begin(), values.end(), 0); }
+    constexpr big_num() { std::fill(values.begin(), values.end(), 0); }
 
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
-
-    // NOLINTNEXTLINE
-    [[nodiscard]] bool is_negative() const { return this->operator[](size - 1); }
 };
 
 template <int msb = 0, int lsb = 0, bool signed_ = false>
@@ -718,13 +762,24 @@ public:
     }
 
     /*
+     * relates to whether it's negative or not
+     */
+    [[nodiscard]] bool negative() const requires(signed_) {
+        if constexpr (native_num) {
+            return value < 0;
+        } else {
+            return value.negative();
+        }
+    }
+
+    /*
      * Slice always produce unsigned result
      */
     /*
      * native holder always produce native numbers
      */
     template <int a, int b>
-    requires(util::max(a, b) < size && native_num && b >= lsb) bits<util::abs_diff(a, b), false>
+    requires(util::max(a, b) < size && native_num && b >= lsb) bits<util::abs_diff(a, b)>
     constexpr inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto base = util::min(msb, lsb);
@@ -745,7 +800,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bits<util::abs_diff(a, b), false> inline slice() const {
+             b >= lsb) constexpr bits<util::abs_diff(a, b)> inline slice() const {
         bits<util::abs_diff(a, b), false> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
@@ -758,7 +813,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && !util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bits<util::abs_diff(a, b), false> inline slice() const {
+             b >= lsb) constexpr bits<util::abs_diff(a, b)> inline slice() const {
         bits<util::abs_diff(a, b), false> result;
         result.value = value.template slice<a, b>();
         return result;
@@ -769,30 +824,34 @@ public:
     // C++ will handle that for us already.
     template <uint64_t target_size>
     requires(target_size > size &&
-             util::native_num(target_size)) bits<target_size - 1, signed_> extend()
+             util::native_num(target_size)) bits<target_size - 1, 0, signed_> extend()
     const { return bits<target_size - 1, signed_>(value); }
 
     template <uint64_t target_size>
-    requires(target_size == size) bits<target_size - 1, signed_> extend()
+    requires(target_size == size) bits<target_size - 1, 0, signed_> extend()
     const { return *this; }
 
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
-    requires(target_size < size) bits<target_size, signed_> extend()
+    requires(target_size < size) bits<target_size, 0, signed_> extend()
     const { return slice<target_size - 1, 0>(); }
 
     // native number, but extend to a big number
     template <uint64_t target_size>
     requires(target_size > size && !util::native_num(target_size) &&
-             native_num) bits<target_size - 1, signed_> extend()
+             native_num) bits<target_size - 1, 0, signed_> extend()
     const {
-        bits<target_size - 1, signed_> result;
-        // use C++ default semantics to cast
+        bits<target_size - 1, 0, signed_> result;
+        // use C++ default semantics to cast. if it's a negative number
+        // the upper bits will be set properly
         result.value.values[0] = static_cast<big_num_holder_type>(value);
         if constexpr (signed_) {
-            for (auto i = 1; i < result.value.s; i++) {
-                // sign extension
-                result.value.valuies[1] = std::numeric_limits<big_num_holder_type>::max();
+            if (negative()) {
+                for (auto i = 1u; i < result.value.s; i++) {
+                    // sign extension
+                    result.value.values[i] = std::numeric_limits<big_num_holder_type>::max();
+                }
+                result.mask_off();
             }
         }
         // if not we're fine since we set everything to zero when we start
@@ -802,7 +861,7 @@ public:
     // big number and gets extended to a big number
     template <uint64_t target_size>
     requires(target_size > size && !util::native_num(target_size) &&
-             !native_num) bits<target_size - 1, signed_> extend()
+             !native_num) bits<target_size - 1, 0, signed_> extend()
     const {
         bits<target_size - 1, 0, signed_> res;
         res.value = value.template extend<target_size>();
@@ -863,6 +922,19 @@ public:
             return std::popcount(value);
         } else {
             return value.popcount();
+        }
+    }
+
+    void mask_off() {
+        if constexpr (native_num) {
+            if constexpr (size > 1) {
+                auto constexpr amount = sizeof(T) * 8 - size;
+                auto constexpr mask_max = std::numeric_limits<T>::max();
+                auto mask = mask_max >> amount;
+                value &= mask;
+            }
+        } else {
+            value.mask_off();
         }
     }
 
@@ -1106,8 +1178,9 @@ public:
      * arithmetic operators: + - * / %
      */
 
-    template <int op_msb, int op_lsb, bool op_signed> requires (bits<op_msb, op_lsb>::size != size)
-    auto operator+(const bits<op_msb, op_lsb, op_signed> &op) const {
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(bits<op_msb, op_lsb>::size != size) auto operator+(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
         return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -1127,6 +1200,31 @@ public:
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l + r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(bits<op_msb, op_lsb>::size != size) auto operator-(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator-(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bits<size - 1, signed_, signed_> result;
+        result.value = value - op.value;
+        return result;
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size))
+        bits<target_size - 1, 0, signed_> minus(const bits<op_msb, op_lsb, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l - r;
         return result;
     }
 
@@ -1195,19 +1293,6 @@ public:
         return *this;
     }
 
-    void mask_off() {
-        if constexpr (native_num) {
-            if constexpr (size > 1) {
-                auto constexpr amount = sizeof(T) * 8 - size;
-                auto constexpr mask_max = std::numeric_limits<T>::max();
-                auto mask = mask_max >> amount;
-                value &= mask;
-            }
-        } else {
-            value.mask_off();
-        }
-    }
-
 private:
     /*
      * unpacking, which is basically slicing as syntax sugars
@@ -1243,6 +1328,9 @@ struct logic {
     // if xz_mask is off, value is the actual integer value
     // if xz_mask is on, 0 in value means x and 1 means z
     bits<msb, lsb> xz_mask;
+
+    // make sure that if we use native number, it's an arithmetic type
+    static_assert((size <= 64 && std::is_arithmetic_v<T>) || (size > 64), "Native number holder");
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -1754,6 +1842,33 @@ struct logic {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l + r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(logic<op_msb, op_lsb>::size != size) auto operator-(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
+        return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator-(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        if (xz_mask.any_set() || op.xz_mask.any_set()) [[unlikely]] {
+            return logic<size - 1, 0, signed_>();
+        } else {
+            return logic<size - 1, 0, signed_>{value - op.value};
+        }
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> minus(const logic<op_msb, op_lsb, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l - r;
         return result;
     }
 
