@@ -276,8 +276,8 @@ public:
     // interim results shall take the size of the largest operand (in case of an
     // assignment, this also includes the left-hand side).
     // Care has to be taken to prevent loss of a significant bit during expression evaluation.
-    template <uint64_t op_size, bool op_signed> requires (op_size != size)
-    auto operator&(const big_num<op_size, op_signed> &op) const {
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator&(const big_num<op_size, op_signed> &op) const {
         return this->template and_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -314,8 +314,8 @@ public:
         return *this;
     }
 
-    template <uint64_t op_size, bool op_signed> requires (op_size != size)
-    auto operator^(const big_num<op_size, op_signed> &op) const {
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator^(const big_num<op_size, op_signed> &op) const {
         return this->template xor_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -553,8 +553,8 @@ public:
      * arithmetic operators: + - * / %
      */
 
-    template <uint64_t op_size, bool op_signed>  requires (op_size != size)
-    auto operator+(const big_num<op_size, op_signed> &op) const {
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator+(const big_num<op_size, op_signed> &op) const {
         return this->template add<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -581,8 +581,8 @@ public:
         return result;
     }
 
-    template <uint64_t op_size, bool op_signed> requires (op_size != size)
-    auto operator-(const big_num<op_size, op_signed> &op) const {
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator-(const big_num<op_size, op_signed> &op) const {
         return this->template minus<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -611,9 +611,7 @@ public:
         return result;
     }
 
-    big_num<size, signed_> operator-() const {
-        return negate();
-    }
+    big_num<size, signed_> operator-() const { return negate(); }
 
     /*
      * mask related stuff
@@ -622,7 +620,7 @@ public:
         // we use the fact that SIMD instructions are faster than compare and branch
         // so summation is faster than any_of in theory
         // also all unused bits are set to 0 by default
-        auto r = std::accumulate(values.begin(), values.end(), 0);
+        auto r = std::reduce(values.begin(), values.end(), 0, [](auto a, auto b) { return a | b; });
         return r != 0;
     }
 
