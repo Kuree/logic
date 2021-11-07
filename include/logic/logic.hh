@@ -610,28 +610,33 @@ public:
 
     template <bool op_signed>
     big_num<size, signed_> operator*(const big_num<size, op_signed> &op) const {
-        if constexpr (size <= (big_num_threshold / 2)) {
-            return big_num<size, signed_>(values[0] * op.values[0]);
-        } else {
-            if (is_zero() || op.is_zero()) return big_num<size, signed_>();
-            if (is_one()) return op;
-            if (op.is_one()) return *this;
+        // we're not using Karatsuba's algorithm since it can get infinitely recursion or underflow
+        // easily given our current setup
+        // using text book version of multiply, which is O(n^2)
+        // we use __uint128 for speed up
+        big_num<size * 2, signed_> result;
+        big_num<size * 2, signed_> temp;
+        for (uint64_t i = 0; i < s; i++) {
+            if (values[i] == 0) continue;
+            for (uint j = 0; j < s; j++) {
+                // deal with special cases
+                if (op.values[j] == 0) continue;
+                __uint128_t a = values[i];
+                __uint128_t b = op.values[j];
+                __uint128_t c = a * b;
+                uint64_t hi = c >> 64u;
+                uint64_t lo = (c << 64u) >> 64;
 
-            // https://en.wikipedia.org/wiki/Karatsuba_algorithm
-            auto constexpr split_idx = size / 2;
-
-            auto const [this_hi, this_lo] = this->template split<split_idx>();
-            auto const [op_hi, op_lo] = op.template split<split_idx>();
-
-            auto z2 = this_hi.template multiply<size>(op_hi);
-            auto z0 = this_lo.template multiply<size>(op_lo);
-            auto z1 = (this_lo + this_hi).template multiply<size>(op_hi + op_lo);
-
-            auto z2_ = z2.template extend<size>() << (split_idx * 2);
-            auto z1_ = z1.template extend<size>() << (split_idx);
-            auto res = z0.template extend<size>() + z1_ + z2_;
-            return res;
+                temp.values[i + j] = lo;
+                result = result + temp;
+                temp.values[i + j] = 0;
+                temp.values[i + j + 1] = hi;
+                result = result + temp;
+                temp.values[i + j + 1] = 0;
+            }
         }
+        auto res = result.template slice<size - 1, 0>();
+        return res;
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
