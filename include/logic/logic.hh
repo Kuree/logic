@@ -636,7 +636,11 @@ public:
             }
         }
         auto res = result.template slice<size - 1, 0>();
-        return res;
+        if constexpr (signed_) {
+            return res.to_signed();
+        } else {
+            return res;
+        }
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
@@ -656,6 +660,12 @@ public:
         constexpr static auto v = big_num<size>(1ul);
         result = result + v;
         return result;
+    }
+
+    [[nodiscard]] big_num<size, true> to_signed() const {
+        big_num<size, true> res;
+        res.values = values;
+        return res;
     }
 
     constexpr big_num<size, signed_> operator-() const { return negate(); }
@@ -902,7 +912,7 @@ public:
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
     requires(target_size < size)
-        [[nodiscard]] constexpr bits<target_size, 0, signed_> extend() const {
+        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
         return slice<target_size - 1, 0>();
     }
 
@@ -1265,7 +1275,7 @@ public:
 
     template <int op_lsb, bool op_signed>
     auto operator+(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, signed_, signed_> result;
+        bits<size - 1, 0, signed_> result;
         result.value = value + op.value;
         return result;
     }
@@ -1290,7 +1300,7 @@ public:
 
     template <int op_lsb, bool op_signed>
     auto operator-(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, signed_, signed_> result;
+        bits<size - 1, 0, signed_> result;
         result.value = value - op.value;
         return result;
     }
@@ -1993,7 +2003,7 @@ struct logic {
     requires(logic<op_msb, op_lsb>::size != size) auto operator*(
         const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
-        return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
+        return this->template multiply<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
