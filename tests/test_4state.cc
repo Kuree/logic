@@ -868,3 +868,28 @@ TEST(logic, multiply) {  // NOLINT
 
     }
 }
+
+TEST(logic, divide) {   // NOLINT
+    using namespace logic::literals;
+    {
+        // big numbers vs big numbers
+        logic::logic<300 -1, 0> a{0u};
+        a = ~a;
+        std::stringstream ss;
+        for (auto i = 0; i < 18; i++) ss << "10";
+        logic::logic<100, 0> b{ss.str()};
+
+        auto c = a / b;
+        printf("%s\n", c.str().c_str());
+    }
+
+}
+
+// we only need to implement > since the reset are based off that
+TEST(logic, gt) {   // NOLINT
+    using namespace logic::literals;
+    {
+        // big number with big numbers
+
+    }
+}

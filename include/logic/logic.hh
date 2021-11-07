@@ -533,22 +533,48 @@ public:
         return (*this) << amount;
     }
 
+    /*
+     * comparators
+     */
     template <uint64_t op_size, bool op_signed>
-    bool operator==(const big_num<op_size, op_signed> &target) const {
-        if constexpr (size >= op_size) {
-            for (auto i = 0u; i < target.s; i++) {
-                if (values[i] != target.values[i]) return false;
+    bool operator==(const big_num<op_size, op_signed> &op) const {
+        if constexpr (signed_ && op_signed) {
+            // doing signed comparison
+            if constexpr (op_size > size) {
+                // extend itself
+                auto t = this->template extend<op_size>();
+                auto constexpr op_s = big_num<op_size, op_signed>::s;
+                for (auto i = 0u; i < op_s; i++) {
+                    if (t.values[i] != op.values[i]) return false;
+                }
+                return true;
+            } else {
+                auto op_t = op->template extend<size>();
+                for (auto i = 0u; i < size; i++) {
+                    if (values[i] != op_t.values[i]) return false;
+                }
+                return true;
             }
-            for (auto i = target.s; i < s; i++) {
-                if (!values[i]) return false;
+        }
+        auto constexpr op_s = big_num<op_size, op_signed>::s;
+        if constexpr (s >= op_s) {
+            for (auto i = 0u; i < op_s; i++) {
+                if (values[i] != op.values[i]) return false;
+            }
+            if constexpr (s == op_s) {
+                return true;
+            } else {
+                // the rest has to be zero
+                return std::reduce(values.begin() + op_s, values.end(), 0,
+                                   [](auto a, auto b) { return a | b; }) == 0;
             }
         } else {
             for (auto i = 0u; i < s; i++) {
-                if (values[i] != target.values[i]) return false;
+                if (values[i] != op.values[i]) return false;
             }
-            for (auto i = s; i < target.s; i++) {
-                if (!target.values[i]) return false;
-            }
+            // the rest has to be zero
+            return std::reduce(op.values.begin() + s, op.values.end(), 0,
+                               [](auto a, auto b) { return a | b; }) == 0;
         }
         return true;
     }
@@ -558,6 +584,50 @@ public:
         auto v_casted = static_cast<uint64_t>(v);
         if (v_casted != values[0]) return false;
         return std::all_of(values.begin() + 1, values.end(), [](auto c) { return c == 0; });
+    }
+
+    template <uint64_t op_size, bool op_signed>
+    bool operator>(const big_num<op_size, op_signed> &op) const {
+        if constexpr (signed_ && op_signed) {
+            if (negative() && !op.negative()) {
+                return false;
+            } else if (!negative() && op.negative()) {
+                return true;
+            }
+            // if it's both positive or both negative, we fall back to the normal comparison
+            // per LRM, signed comparison is only used when both operands are signed
+        }
+        // from top to bottom comparison
+        auto top = util::max(s, big_num<op_size, op_signed>::s);
+        for (auto i = 0u; i < top; i++) {
+            auto idx = top - i - 1;
+            if (idx >= s) {
+                if (op.values[idx] != 0) return false;
+            } else if (idx >= big_num<op_size, op_signed>::s) {
+                if (values[idx] != 0) return true;
+            } else {
+                if (values[idx] != op.values[idx]) {
+                    return values[idx] > op.values[idx];
+                }
+            }
+        }
+        // it means they are the same, return false
+        return false;
+    }
+
+    template <uint64_t op_size, bool op_signed>
+    bool operator<(const big_num<op_size, op_signed> &op) const {
+        return op > (*this);
+    }
+
+    template <uint64_t op_size, bool op_signed>
+    bool operator>=(const big_num<op_size, op_signed> &op) const {
+        return (*this) > op || (*this) == op;
+    }
+
+    template <uint64_t op_size, bool op_signed>
+    bool operator<=(const big_num<op_size, op_signed> &op) const {
+        return op >= (*this);
     }
 
     /*
@@ -622,12 +692,21 @@ public:
     template <bool op_signed>
     big_num<size, util::signed_result(signed_, op_signed)> operator*(
         const big_num<size, op_signed> &op) const {
+        big_num<size, util::signed_result(signed_, op_signed)> result;
+        // if it fits in uint64 then we're gold
+        if (fit_in_64() && op.fit_in_64()) {
+            __uint128_t a = values[0];
+            __uint128_t b = op.values[0];
+            __uint128_t c = a * b;
+            result.values[0] = (c << 64) >> 64;
+            result.values[1] = c >> 64;
+            return result;
+        }
         // we're not using Karatsuba's algorithm since it can get infinitely recursion or underflow
         // easily given our current setup
         // using text book version of multiply, which is O(n^2)
         // we use __uint128 for speed up
-        big_num<size * 2, util::signed_result(signed_, op_signed)> result;
-        big_num<size * 2, false> temp;
+        big_num<size, false> temp;
         for (uint64_t i = 0; i < s; i++) {
             if (values[i] == 0) continue;
             for (uint j = 0; j < s; j++) {
@@ -639,15 +718,19 @@ public:
                 uint64_t hi = c >> 64u;
                 uint64_t lo = (c << 64u) >> 64;
 
-                temp.values[i + j] = lo;
-                result = result + temp;
-                temp.values[i + j] = 0;
-                temp.values[i + j + 1] = hi;
-                result = result + temp;
-                temp.values[i + j + 1] = 0;
+                if ((i + j) < size) {
+                    temp.values[i + j] = lo;
+                    result = result + temp;
+                    temp.values[i + j] = 0;
+                }
+                if ((i + j + 1) < size) {
+                    temp.values[i + j + 1] = hi;
+                    result = result + temp;
+                    temp.values[i + j + 1] = 0;
+                }
             }
         }
-        auto res = result.template slice<size - 1, 0>();
+        auto res = result;
         return res;
     }
 
@@ -658,6 +741,27 @@ public:
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l * r;
+        return result;
+    }
+
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator/(const big_num<op_size, op_signed> &op) const {
+        return this->template divide<util::max(size, op_size), op_size, op_signed>(op);
+    }
+
+    template <bool op_signed>
+    big_num<size, util::signed_result(signed_, op_signed)> operator/(
+        const big_num<size, op_signed> &op) const {
+        return div_mod(op).first;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed>
+    requires(target_size >=
+             util::max(size, op_size)) auto divide(const big_num<op_size, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l / r;
         return result;
     }
 
@@ -700,6 +804,99 @@ public:
 
     [[maybe_unused]] void unmask() { std::fill(values.begin(), values.end(), 0); }
 
+    /*
+     * helper functions
+     */
+
+    [[nodiscard]] bool is_one() const {
+        if constexpr (s == 1) {
+            return values[0] == 1u;
+        } else {
+            return values[0] == 1u && (std::reduce(values.begin() + 1, values.end(), 0,
+                                                   [](auto a, auto b) { return a | b; }) == 0u);
+        }
+    }
+
+    [[nodiscard]] bool fit_in_64() const {
+        return std::reduce(values.begin() + 1, values.end(), 0,
+                           [](auto a, auto b) { return a | b; }) == 0;
+    }
+
+    template <bool op_signed>
+    std::pair<big_num<size, util::signed_result(signed_, op_signed)>,
+              big_num<size, util::signed_result(signed_, op_signed)>>
+    div_mod(const big_num<size, op_signed> &op) const {
+        // we only do unsigned division
+        constexpr bool result_signed = util::signed_result(signed_, op_signed);
+        // notice that if we divide by zero, we return 0, per convention,
+        // since we are not allowed to throw exception in the simulation
+        big_num<size, result_signed> q;
+        big_num<size, result_signed> r;
+        if (!op.any_set()) {
+            return {q, r};
+        }
+        if constexpr (result_signed) {
+            // this implies that both of them are signed numbers
+            auto op_pos = op.negative() ? op.negate() : op;
+            auto this_pos = negative() ? negate() : *this;
+            std::tie(q, r) = this_pos.div_mode_(op);
+            // if both of them are negative or positive, the sign will cancel out
+            if (op.negative() ^ negative()) {
+                q = q.negate();
+                r = r.negate();
+            }
+        } else {
+            std::tie(q, r) = div_mod_unsigned(op);
+        }
+        return {q, r};
+    }
+
+    std::pair<big_num<size, false>, big_num<size, false>> div_mod_unsigned(
+        const big_num<size, false> &op) const requires(!signed_) {
+        // deal with some special cases
+        if (op.is_one()) {
+            return std::make_pair(*this, big_num<size, false>{0u});
+        } else if ((*this) == op) {
+            return std::make_pair(big_num<size, false>{1u}, big_num<size, false>{0u});
+        } else if ((*this) < op) {
+            return std::make_pair(big_num<size, false>{0u}, *this);
+        } else if (fit_in_64() && op.fit_in_64()) {
+            auto q = values[0] / op.values[0];
+            auto r = values[0] % op.values[0];
+            return std::make_pair(big_num<size, false>{q}, big_num<size, false>{r});
+        }
+
+        // code to figure out the set bit
+        auto const this_hi_bit = highest_bit();
+        auto const op_hi_bit = op.highest_bit();
+        auto const diff_bits = this_hi_bit - op_hi_bit;
+
+        big_num<size, false> q;
+        big_num<size, false> r = *this;
+        for (auto i = 0u; i <= diff_bits; i++) {
+            // shift r to the correct bits, could be too big
+            auto t = op << (diff_bits - i);
+            if (r >= t) {
+                r = r - t;
+                q.set(diff_bits - i, true);
+            }
+        }
+
+        return std::make_pair(q, r);
+    }
+
+    [[nodiscard]] uint64_t highest_bit() const {
+        for (auto i = 0u; i < s; i++) {
+            auto const v = values[s - i - 1];
+            if (v != 0) {
+                auto r = __builtin_clzll(v);
+                return (s - i) * 64 - r - 1;
+            }
+        }
+        // this is undefined behavior
+        return s;
+    }
+
     // constructors
     constexpr explicit big_num(std::string_view v) {
         std::fill(values.begin(), values.end(), 0);
@@ -732,8 +929,7 @@ public:
     // set values to 0 when initialized
     constexpr big_num() { std::fill(values.begin(), values.end(), 0); }
 
-    // implicit conversion from signed to unsigned
-    // for unsigned to signed we need explicit conversion
+    // implicit conversion between signed and unsigned
     template <uint64_t op_size, bool op_signed>
     requires(op_size == size && op_signed != signed_)
         [[maybe_unused]] big_num(const big_num<op_size, op_signed> &op)  // NOLINT
@@ -1332,6 +1528,30 @@ public:
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l * r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(bits<op_msb, op_lsb>::size != size) auto operator/(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template divide<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator/(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+        result.value = value / op.value;
+        return result;
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto divide(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l / r;
         return result;
     }
 
@@ -2016,6 +2236,33 @@ struct logic {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l * r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(logic<op_msb, op_lsb>::size != size) auto operator/(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
+        return this->template divide<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator/(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        // if the op is 0, return x
+        if (xz_mask.any_set() || op.xz_mask.any_set() || !op.value.any_set()) [[unlikely]] {
+            return logic<size - 1, 0, util::signed_result(signed_, op_signed)>();
+        } else {
+            return logic<size - 1, 0, util::signed_result(signed_, op_signed)>{value / op.value};
+        }
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto divide(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l / r;
         return result;
     }
 
