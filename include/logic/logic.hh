@@ -610,26 +610,28 @@ public:
 
     template <bool op_signed>
     big_num<size, signed_> operator*(const big_num<size, op_signed> &op) const {
-        if constexpr (size <= big_num_threshold) {
-            return values[0] * op.values[0];
+        if constexpr (size <= (big_num_threshold / 2)) {
+            return big_num<size, signed_>(values[0] * op.values[0]);
+        } else {
+            if (is_zero() || op.is_zero()) return big_num<size, signed_>();
+            if (is_one()) return op;
+            if (op.is_one()) return *this;
+
+            // https://en.wikipedia.org/wiki/Karatsuba_algorithm
+            auto constexpr split_idx = size / 2;
+
+            auto const [this_hi, this_lo] = this->template split<split_idx>();
+            auto const [op_hi, op_lo] = op.template split<split_idx>();
+
+            auto z2 = this_hi.template multiply<size>(op_hi);
+            auto z0 = this_lo.template multiply<size>(op_lo);
+            auto z1 = (this_lo + this_hi).template multiply<size>(op_hi + op_lo);
+
+            auto z2_ = z2.template extend<size>() << (split_idx * 2);
+            auto z1_ = z1.template extend<size>() << (split_idx);
+            auto res = z0.template extend<size>() + z1_ + z2_;
+            return res;
         }
-        if (is_zero() || op.is_zero()) return big_num<size, signed_>();
-        if (is_one()) return op;
-        if (op.is_one()) return *this;
-
-        // https://en.wikipedia.org/wiki/Karatsuba_algorithm
-        auto constexpr split_idx = size / 2;
-
-        auto const [this_hi, this_lo] = split<split_idx>();
-        auto const [op_hi, op_lo] = op.template split<split_idx>();
-
-        auto z2 = this_hi * op_hi;
-        auto z0 = this_lo * op_lo;
-        auto z1 = (this_lo + this_hi) * (op_hi + op_lo);
-
-        z2 = z2 << (split_idx * 2);
-        z1 = z1 << (split_idx);
-        return z0 + z1 + z2;
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
@@ -651,7 +653,8 @@ public:
         return result;
     }
 
-    big_num<size, signed_> operator-() const { return negate(); }
+    constexpr big_num<size, signed_> operator-() const { return negate(); }
+    constexpr big_num<size, signed_> operator+() const { return *this; }
 
     /*
      * mask related stuff
@@ -715,17 +718,17 @@ private:
 
     [[nodiscard]] bool is_one() const {
         if constexpr (s == 1) {
-            return values[0] == 1;
+            return values[0] == 1u;
         } else {
-            return values[0] == 1 && std::reduce(values.begin() + 1, values.end(),
-                                                 [](auto a, auto b) { return a | b; });
+            return values[0] == 1u && (std::reduce(values.begin() + 1, values.end(), 0,
+                                                   [](auto a, auto b) { return a | b; }) == 0u);
         }
     }
 
     template <uint64_t split_idx>
     requires(split_idx > 0 && split_idx < size) [[nodiscard]] auto split() const {
-        auto a = slice<split_idx - 1, 0>().template extend<size>();
-        auto b = slice<size - 1, split_idx>().template extend<size>();
+        auto a = slice<split_idx - 1, 0>();
+        auto b = slice<size - 1, split_idx>();
         return std::make_pair(b, a);
     }
 };
@@ -880,24 +883,28 @@ public:
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
     template <uint64_t target_size>
-    requires(target_size > size &&
-             util::native_num(target_size)) bits<target_size - 1, 0, signed_> extend()
-    const { return bits<target_size - 1, signed_>(value); }
+    requires(target_size > size && util::native_num(target_size))
+        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
+        return bits<target_size - 1, 0, signed_>(value);
+    }
 
     template <uint64_t target_size>
-    requires(target_size == size) bits<target_size - 1, 0, signed_> extend()
-    const { return *this; }
+    requires(target_size == size)
+        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
+        return *this;
+    }
 
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
-    requires(target_size < size) bits<target_size, 0, signed_> extend()
-    const { return slice<target_size - 1, 0>(); }
+    requires(target_size < size)
+        [[nodiscard]] constexpr bits<target_size, 0, signed_> extend() const {
+        return slice<target_size - 1, 0>();
+    }
 
     // native number, but extend to a big number
     template <uint64_t target_size>
-    requires(target_size > size && !util::native_num(target_size) &&
-             native_num) bits<target_size - 1, 0, signed_> extend()
-    const {
+    requires(target_size > size && !util::native_num(target_size) && native_num)
+        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
         bits<target_size - 1, 0, signed_> result;
         // use C++ default semantics to cast. if it's a negative number
         // the upper bits will be set properly
@@ -917,9 +924,8 @@ public:
 
     // big number and gets extended to a big number
     template <uint64_t target_size>
-    requires(target_size > size && !util::native_num(target_size) &&
-             !native_num) bits<target_size - 1, 0, signed_> extend()
-    const {
+    requires(target_size > size && !util::native_num(target_size) && !native_num)
+        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
         bits<target_size - 1, 0, signed_> res;
         res.value = value.template extend<target_size>();
         return res;
@@ -1231,6 +1237,16 @@ public:
         return value == v.value;
     }
 
+    constexpr bits<msb, lsb, signed_> operator-() const {
+        if constexpr (native_num) {
+            return bits<msb, lsb, signed_>(-value);
+        } else {
+            return bits<msb, lsb, signed_>(value.negate());
+        }
+    }
+
+    constexpr auto operator+() const { return *this; }
+
     /*
      * arithmetic operators: + - * / %
      */
@@ -1294,7 +1310,7 @@ public:
 
     template <int op_lsb, bool op_signed>
     auto operator*(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, signed_, signed_> result;
+        bits<size - 1, 0, signed_> result;
         result.value = value * op.value;
         return result;
     }
@@ -1404,7 +1420,6 @@ template <int msb, int lsb, bool signed_>
 struct logic {
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;
-    using T = typename util::get_holder_type<size, signed_>::type;
     bits<msb, lsb, signed_> value;
     // To reduce memory footprint, we use the following encoding scheme
     // if xz_mask is off, value is the actual integer value
@@ -1412,7 +1427,9 @@ struct logic {
     bits<msb, lsb> xz_mask;
 
     // make sure that if we use native number, it's an arithmetic type
-    static_assert((size <= 64 && std::is_arithmetic_v<T>) || (size > 64), "Native number holder");
+    static_assert((size <= 64 && std::is_arithmetic_v<typename bits<msb, lsb, signed_>::T>) ||
+                      (size > 64),
+                  "Native number holder");
 
     // basic formatting
     [[nodiscard]] std::string str() const {
@@ -1547,8 +1564,8 @@ struct logic {
      * extend
      */
     template <uint64_t target_size>
-    requires(target_size >= size) logic<target_size - 1, 0, signed_> extend()
-    const {
+    requires(target_size >= size)
+        [[nodiscard]] constexpr logic<target_size - 1, 0, signed_> extend() const {
         logic<target_size - 1, 0, signed_> result;
         result.value = value.template extend<target_size>();
         result.xz_mask = xz_mask.template extend<target_size>();
@@ -1896,6 +1913,19 @@ struct logic {
         return value == target.value ? one_() : zero_();
     }
 
+    constexpr auto operator-() const {
+        if (xz_mask.any_set()) return logic<msb, lsb, signed_>();
+        logic<msb, lsb, signed_> result(0);
+        static_assert(!std::is_same_v<int, decltype(value)>);
+        result.value = -value;
+        return result;
+    }
+
+    constexpr auto operator+() const {
+        if (xz_mask.any_set()) return logic<msb, lsb, signed_>();
+        return *this;
+    }
+
     /*
      * arithmetic operators: + - * / %
      */
@@ -1987,7 +2017,8 @@ struct logic {
     // by default everything is x
     constexpr logic() { xz_mask.mask(); }
 
-    explicit constexpr logic(T value) requires(size <= big_num_threshold)
+    template <typename T>
+    requires(size <= big_num_threshold) explicit constexpr logic(T value)
         : value(bits<msb, lsb, signed_>(value)) {}
 
     template <typename K>
