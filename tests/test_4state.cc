@@ -859,4 +859,12 @@ TEST(logic, multiply) {  // NOLINT
                   "11111111111111111111111111111111111111111111111111111111111111111111111111111111"
                   "11111111111111010110");
     }
+
+    {
+        // small number and small number
+        auto a = logic::logic<9, 0>(10);
+        auto b = logic::logic<2, 0>(3);
+        EXPECT_EQ(a * b, 30_logic);
+
+    }
 }
