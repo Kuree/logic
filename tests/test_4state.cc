@@ -820,3 +820,14 @@ TEST(logic, minus) {  // NOLINT
         EXPECT_EQ(ref.str(), d.str());
     }
 }
+
+
+TEST(logic, multiply) {  // NOLINT
+    using namespace logic::literals;
+    {
+        // small numbers
+        auto a = -1_logic;
+
+    }
+}
+

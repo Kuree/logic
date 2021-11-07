@@ -603,6 +603,46 @@ public:
         return result;
     }
 
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator*(const big_num<op_size, op_signed> &op) const {
+        return this->template multiply<util::max(size, op_size), op_size, op_signed>(op);
+    }
+
+    template <bool op_signed>
+    big_num<size, signed_> operator*(const big_num<size, op_signed> &op) const {
+        if constexpr (size <= big_num_threshold) {
+            return values[0] * op.values[0];
+        }
+        if (is_zero() || op.is_zero()) return big_num<size, signed_>();
+        if (is_one()) return op;
+        if (op.is_one()) return *this;
+
+        // https://en.wikipedia.org/wiki/Karatsuba_algorithm
+        auto constexpr split_idx = size / 2;
+
+        auto const [this_hi, this_lo] = split<split_idx>();
+        auto const [op_hi, op_lo] = op.template split<split_idx>();
+
+        auto z2 = this_hi * op_hi;
+        auto z0 = this_lo * op_lo;
+        auto z1 = (this_lo + this_hi) * (op_hi + op_lo);
+
+        z2 = z2 << (split_idx * 2);
+        z1 = z1 << (split_idx);
+        return z0 + z1 + z2;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed>
+    requires(target_size >= util::max(size, op_size)) big_num<target_size, signed_> multiply(
+        const big_num<op_size, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l * r;
+        return result;
+    }
+
     [[nodiscard]] big_num<size, signed_> negate() const {
         // 2's complement
         big_num<size, signed_> result = ~(*this);
@@ -669,6 +709,25 @@ public:
 
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
+
+    // helper functions to speed up computation
+    [[nodiscard]] bool is_zero() const { return !any_set(); }
+
+    [[nodiscard]] bool is_one() const {
+        if constexpr (s == 1) {
+            return values[0] == 1;
+        } else {
+            return values[0] == 1 && std::reduce(values.begin() + 1, values.end(),
+                                                 [](auto a, auto b) { return a | b; });
+        }
+    }
+
+    template <uint64_t split_idx>
+    requires(split_idx > 0 && split_idx < size) [[nodiscard]] auto split() const {
+        auto a = slice<split_idx - 1, 0>().template extend<size>();
+        auto b = slice<size - 1, split_idx>().template extend<size>();
+        return std::make_pair(b, a);
+    }
 };
 
 template <int msb = 0, int lsb = 0, bool signed_ = false>
@@ -1223,6 +1282,31 @@ public:
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l - r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(bits<op_msb, op_lsb>::size != size) auto operator*(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template multiply<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator*(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bits<size - 1, signed_, signed_> result;
+        result.value = value * op.value;
+        return result;
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size))
+        bits<target_size - 1, 0, signed_> multiply(const bits<op_msb, op_lsb, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l * r;
         return result;
     }
 
@@ -1870,6 +1954,33 @@ struct logic {
         return result;
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(logic<op_msb, op_lsb>::size != size) auto operator*(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
+        return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator*(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        if (xz_mask.any_set() || op.xz_mask.any_set()) [[unlikely]] {
+            return logic<size - 1, 0, signed_>();
+        } else {
+            return logic<size - 1, 0, signed_>{value * op.value};
+        }
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+        logic<target_size - 1, 0, signed_> multiply(const logic<op_msb, op_lsb, op_signed> &op)
+    const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l * r;
+        return result;
+    }
+
     /*
      * constructors
      */
@@ -1911,6 +2022,7 @@ struct logic {
              util::abs_diff(msb,
                             lsb)) explicit logic(const logic<new_msb, new_lsb, new_signed> &target)
         : value(target.value), xz_mask(target.xz_mask) {}
+    // safe conversions
 
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
@@ -1967,9 +2079,16 @@ private:
 
 inline namespace literals {
 // constexpr to parse SystemVerilog literals
-// per SV standard, if size not specified, the default size is 32
-constexpr logic<32> operator""_logic(unsigned long long value) { return logic<32>(value); }
-constexpr logic<64> operator""_logic64(unsigned long long value) { return logic<64>(value); }
+// per LRM, if size not specified, the default size is 32
+//     it will be signed as well
+// in C++ we only allow unsigned integer. as a result, we will create a number that's
+// 1 bit less to account for negative number
+constexpr logic<31, 0, true> operator""_logic(unsigned long long value) {
+    return logic<30, 0, true>(static_cast<int32_t>(value)).extend<32>();
+}
+constexpr logic<63, 0, true> operator""_logic64(unsigned long long value) {
+    return logic<62, 0, true>(static_cast<int64_t>(value)).extend<64>();
+}
 }  // namespace literals
 
 }  // namespace logic
