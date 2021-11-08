@@ -865,31 +865,32 @@ TEST(logic, multiply) {  // NOLINT
         auto a = logic::logic<9, 0>(10);
         auto b = logic::logic<2, 0>(3);
         EXPECT_EQ(a * b, 30_logic);
-
     }
 }
 
-TEST(logic, divide) {   // NOLINT
+TEST(logic, divide) {  // NOLINT
     using namespace logic::literals;
     {
         // big numbers vs big numbers
-        logic::logic<300 -1, 0> a{0u};
+        logic::logic<300 - 1, 0> a{0u};
         a = ~a;
         std::stringstream ss;
         for (auto i = 0; i < 18; i++) ss << "10";
         logic::logic<100, 0> b{ss.str()};
 
         auto c = a / b;
-        printf("%s\n", c.str().c_str());
+        EXPECT_EQ(c.str(),
+                  "00000000000000000000000000000000000110000000000000000000000000000000000110000000"
+                  "00000000000000000000000000011000000000000000000000000000000000011000000000000000"
+                  "00000000000000000001100000000000000000000000000000000001100000000000000000000000"
+                  "000000000001100000000000000000000000000000000001100000000000");
     }
-
 }
 
 // we only need to implement > since the reset are based off that
-TEST(logic, gt) {   // NOLINT
+TEST(logic, gt) {  // NOLINT
     using namespace logic::literals;
     {
         // big number with big numbers
-
     }
 }

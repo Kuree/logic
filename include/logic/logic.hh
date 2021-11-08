@@ -643,11 +643,13 @@ public:
     big_num<size, util::signed_result(signed_, op_signed)> operator+(
         const big_num<size, op_signed> &op) const {
         big_num<size, util::signed_result(signed_, op_signed)> result;
-        uint64_t carry = 0;
+        // based on the compiler explorer, using 128 bit is the "best" implementation
+        // "best" as in the fewest instructions
+        __uint128_t carry = 0;
         for (auto i = 0u; i < s; i++) {
-            result.values[i] = carry + values[i] + op.values[i];
-            // notice that this is actually UB to let it overflow!!
-            carry = result.values[i] < values[i];
+            auto v = carry + values[i] + op.values[i];
+            result.values[i] = (v << 64) >> 64;
+            carry = v >> 64;
         }
         return result;
     }
