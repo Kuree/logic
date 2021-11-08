@@ -767,6 +767,27 @@ public:
         return result;
     }
 
+    template <uint64_t op_size, bool op_signed>
+    requires(op_size != size) auto operator%(const big_num<op_size, op_signed> &op) const {
+        return this->template mod<util::max(size, op_size), op_size, op_signed>(op);
+    }
+
+    template <bool op_signed>
+    big_num<size, util::signed_result(signed_, op_signed)> operator%(
+        const big_num<size, op_signed> &op) const {
+        return div_mod(op).second;
+    }
+
+    template <uint64_t target_size, uint64_t op_size, bool op_signed>
+    requires(target_size >=
+             util::max(size, op_size)) auto mod(const big_num<op_size, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l % r;
+        return result;
+    }
+
     [[nodiscard]] big_num<size, signed_> negate() const {
         // 2's complement
         big_num<size, signed_> result = ~(*this);
@@ -1534,6 +1555,30 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    requires(bits<op_msb, op_lsb>::size != size) auto operator%(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        return this->template mod<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator%(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+        result.value = value % op.value;
+        return result;
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto mod(
+        const bits<op_msb, op_lsb, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l % r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     requires(bits<op_msb, op_lsb>::size != size) auto operator/(
         const bits<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
@@ -2265,6 +2310,33 @@ struct logic {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l / r;
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires(logic<op_msb, op_lsb>::size != size) auto operator%(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
+        return this->template mod<target_size, op_msb, op_lsb, op_signed>(op);
+    }
+
+    template <int op_lsb, bool op_signed>
+    auto operator%(const logic<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        // if the op is 0, return x
+        if (xz_mask.any_set() || op.xz_mask.any_set() || !op.value.any_set()) [[unlikely]] {
+            return logic<size - 1, 0, util::signed_result(signed_, op_signed)>();
+        } else {
+            return logic<size - 1, 0, util::signed_result(signed_, op_signed)>{value % op.value};
+        }
+    }
+
+    template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
+    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto mod(
+        const logic<op_msb, op_lsb, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        auto r = op.template extend<target_size>();
+        auto result = l % r;
         return result;
     }
 
