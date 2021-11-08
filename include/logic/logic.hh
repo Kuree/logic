@@ -633,9 +633,25 @@ public:
         return op > (*this);
     }
 
+    template <typename T>
+    requires(std::is_arithmetic_v<T>) bool operator<=(T v) const {
+        auto constexpr is_signed = std::is_signed_v<T>();
+        auto op = big_num<sizeof(T) * 8, is_signed>();
+        op.values[0] = static_cast<uint64_t>(v);
+        return (*this) <= op;
+    }
+
     template <uint64_t op_size, bool op_signed>
     bool operator>=(const big_num<op_size, op_signed> &op) const {
         return (*this) > op || (*this) == op;
+    }
+
+    template <typename T>
+    requires(std::is_arithmetic_v<T>) bool operator>=(T v) const {
+        auto constexpr is_signed = std::is_signed_v<T>();
+        auto op = big_num<sizeof(T) * 8, is_signed>();
+        op.values[0] = static_cast<uint64_t>(v);
+        return (*this) >= op;
     }
 
     template <uint64_t op_size, bool op_signed>
@@ -1493,6 +1509,48 @@ public:
         }
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    bool operator<(const bits<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+            // LRM specifies that on ly if both operands are signed we do signed comparison
+            if constexpr (signed_ && op_signed) {
+                return value < v.value;
+            } else {
+                return static_cast<uint64_t>(value) < static_cast<uint64_t>(v.value);
+            }
+        } else if constexpr (!native_num) {
+            return value < v.value;
+        }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    bool operator>=(const bits<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+            // LRM specifies that on ly if both operands are signed we do signed comparison
+            if constexpr (signed_ && op_signed) {
+                return value >= v.value;
+            } else {
+                return static_cast<uint64_t>(value) >= static_cast<uint64_t>(v.value);
+            }
+        } else if constexpr (!native_num) {
+            return value >= v.value;
+        }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    bool operator<=(const bits<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+            // LRM specifies that on ly if both operands are signed we do signed comparison
+            if constexpr (signed_ && op_signed) {
+                return value <= v.value;
+            } else {
+                return static_cast<uint64_t>(value) <= static_cast<uint64_t>(v.value);
+            }
+        } else if constexpr (!native_num) {
+            return value <= v.value;
+        }
+    }
+
     constexpr bits<msb, lsb, signed_> operator-() const {
         if constexpr (native_num) {
             return bits<msb, lsb, signed_>(-value);
@@ -2233,6 +2291,24 @@ struct logic {
     logic<0> operator>(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value > target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator<(const logic<op_msb, op_lsb, op_signed> &target) const {
+        if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
+        return value < target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator>=(const logic<op_msb, op_lsb, op_signed> &target) const {
+        if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
+        return value >= target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator<=(const logic<op_msb, op_lsb, op_signed> &target) const {
+        if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
+        return value <= target.value ? one_() : zero_();
     }
 
     constexpr auto operator-() const {
