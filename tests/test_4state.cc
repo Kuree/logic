@@ -951,4 +951,50 @@ TEST(logic, mod) {  // NOLINT
 // we only need to implement > since the reset are based off that
 TEST(logic, gt) {  // NOLINT
     using namespace logic::literals;
+    {
+        // big number one signed one unsigned
+        // should be unsigned comparison
+        logic::logic<100, 0, true> a{0u};
+        a = (~a).to_signed();  // should be -1
+        logic::logic<100> b{10u};
+        EXPECT_TRUE(a > b);
+    }
+
+    {
+        // big number one signed one unsigned
+        // should be unsigned comparison
+        logic::logic<100, 0, true> a{0u};
+        a = (~a).to_signed();  // should be -1
+        logic::logic<100, 0, true> b{10u};
+        b = (~b).to_signed();
+        EXPECT_TRUE(a > b);
+        b = logic::logic<100, 0, true>{10u};
+        EXPECT_FALSE(a > b);
+    }
+
+    {
+        // two small numbers
+        auto a = -2_logic;
+        auto b = 3_logic;
+        EXPECT_TRUE(b > a);
+        logic::logic<31> c{1u};
+        EXPECT_TRUE(a > c);
+        auto d = -1_logic;
+        EXPECT_TRUE(d > a);
+    }
+
+    {
+        logic::logic<20> a{42u};
+        logic::logic<10> b{20u};
+        EXPECT_TRUE(a > b);
+    }
+
+    {
+        // two big signed numbers
+        logic::logic<100, 0, true> a{0u};
+        a = (~a).to_signed();  // should be -1
+        logic::logic<100, 0, true> b{10u};
+        b = (~b).to_signed();  // should be -10;
+        EXPECT_TRUE(a > b);
+    }
 }
