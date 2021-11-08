@@ -817,6 +817,35 @@ public:
         return result;
     }
 
+    template <uint64_t target_size, uint64_t op_size, bool op_signed>
+    requires(target_size >=
+             util::max(size, op_size)) auto power(const big_num<op_size, op_signed> &op) const {
+        // resize things to target size
+        auto l = this->template extend<target_size>();
+        // power by squaring
+        // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+        // TODO:
+        //  IMPLEMENT LRM Table 11-4
+        big_num<target_size, util::signed_result(signed_, op_signed)> result;
+        if (op.is_one()) {
+            return l;
+        } else if (!any_set()) {
+            // ill-defined. use 0
+            // or raise zero to some number, which is zero as well
+            return result;
+        } else if (!op.any_set()) {
+            result.values[0] = 1u;
+            return result;
+        }
+
+        if (op.values[0] % 2 == 0) {
+            return (l * l).power(op / 2);
+        } else {
+            // recursion
+            return (*this) * (l * l).power((op - 1) / 2);
+        }
+    }
+
     [[nodiscard]] big_num<size, signed_> negate() const {
         // 2's complement
         big_num<size, signed_> result = ~(*this);
