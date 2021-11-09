@@ -11,4 +11,4 @@ function(add_test target)
     endif()
 endfunction()
 
-add_test(test_4state)
+add_test(test_logic)
