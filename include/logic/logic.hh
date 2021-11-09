@@ -249,7 +249,7 @@ public:
     }
 
     void mask_off() {
-        // mask off bits that's excessive bits
+        // mask off bit that's excessive bit
         auto constexpr amount = s * 64 - size;
         auto constexpr mask = std::numeric_limits<uint64_t>::max() >> amount;
         values[s - 1] &= mask;
@@ -268,7 +268,7 @@ public:
         for (uint i = 0; i < s; i++) {
             result.values[i] = ~values[i];
         }
-        // mask off the top bits, if any
+        // mask off the top bit, if any
         for (auto i = size; i < s * big_num_threshold; i++) {
             result.set(i, false);
         }
@@ -397,7 +397,7 @@ public:
 
     // reduction
     [[maybe_unused]] [[nodiscard]] bool r_and() const {
-        // only if all the bits are set
+        // only if all the bit are set
         auto b = std::all_of(values.begin(), values.begin() + s - 1, [](auto const v) {
             return v == std::numeric_limits<uint64_t>::max();
         });
@@ -438,7 +438,7 @@ public:
         const big_num<op_size, op_signed> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
-        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // if the big number amount actually uses more than 1 uint64 and high bit set,
         // the result has to be zero
         for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) return big_num<size, util::signed_result(signed_, op_signed)>{};
@@ -464,7 +464,7 @@ public:
         const big_num<op_size, op_signed> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
-        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // if the big number amount actually uses more than 1 uint64 and high bit set,
         // the result has to be zero
         for (auto i = 1u; i < amount.s; i++) {
             if (amount.values[i]) return big_num<size, signed_>{};
@@ -484,7 +484,7 @@ public:
                 }
                 return res;
             }
-            // set high bits
+            // set high bit
             bool negative = this->negative();
             for (uint64_t i = 0; i < amount; i++) {
                 auto dst = size - i - 1;
@@ -505,7 +505,7 @@ public:
         const big_num<op_size, op_signed> &amount) const {
         // we will implement logic shifts regardless of the sign
         // we utilize the property that, since the max size of the logic is 2^64,
-        // if the big number amount actually uses more than 1 uint64 and high bits set,
+        // if the big number amount actually uses more than 1 uint64 and high bit set,
         // the result has to be zero
         big_num<size, util::signed_result(signed_, op_signed)> res;
         for (auto i = 1u; i < amount.s; i++) {
@@ -869,7 +869,7 @@ public:
     [[nodiscard]] bool any_set() const {
         // we use the fact that SIMD instructions are faster than compare and branch
         // so summation is faster than any_of in theory
-        // also all unused bits are set to 0 by default
+        // also all unused bit are set to 0 by default
         auto r = std::reduce(values.begin(), values.end(), 0, [](auto a, auto b) { return a | b; });
         return r != 0;
     }
@@ -878,7 +878,7 @@ public:
         for (auto i = 0u; i < (s - 1); i++) {
             values[i] = std::numeric_limits<big_num_holder_type>::max();
         }
-        // last bits
+        // last bit
         values[s - 1] =
             std::numeric_limits<big_num_holder_type>::max() >> (s * big_num_threshold - size);
     }
@@ -955,7 +955,7 @@ public:
         big_num<size, false> q;
         big_num<size, false> r = *this;
         for (auto i = 0u; i <= diff_bits; i++) {
-            // shift r to the correct bits, could be too big
+            // shift r to the correct bit, could be too big
             auto t = op << (diff_bits - i);
             if (r >= t) {
                 r = r - t;
@@ -1024,7 +1024,7 @@ template <int msb = 0, int lsb = 0, bool signed_ = false>
 struct logic;
 
 template <int msb = 0, int lsb = 0, bool signed_ = false>
-struct bits {
+struct bit {
 private:
 public:
     constexpr static auto size = util::abs_diff(msb, lsb) + 1;
@@ -1126,14 +1126,14 @@ public:
      * native holder always produce native numbers
      */
     template <int a, int b>
-    requires(util::max(a, b) < size && native_num && b >= lsb) bits<util::abs_diff(a, b)>
+    requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
     constexpr inline slice() const {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto base = util::min(msb, lsb);
         constexpr auto max = util::max(a, b) - base;
         constexpr auto min = util::min(a, b) - base;
         constexpr auto t_size = sizeof(T) * 8;
-        bits<util::abs_diff(a, b), false> result;
+        bit<util::abs_diff(a, b), false> result;
         constexpr auto default_mask = std::numeric_limits<T>::max();
         uint64_t mask = default_mask << min;
         mask &= (default_mask >> (t_size - max - 1));
@@ -1147,8 +1147,8 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bits<util::abs_diff(a, b)> inline slice() const {
-        bits<util::abs_diff(a, b), false> result;
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const {
+        bit<util::abs_diff(a, b), false> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
         result.value = res.values[0];
@@ -1160,8 +1160,8 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && !util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bits<util::abs_diff(a, b)> inline slice() const {
-        bits<util::abs_diff(a, b), false> result;
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const {
+        bit<util::abs_diff(a, b), false> result;
         result.value = value.template slice<a, b>();
         return result;
     }
@@ -1171,30 +1171,30 @@ public:
     // C++ will handle that for us already.
     template <uint64_t target_size>
     requires(target_size > size && util::native_num(target_size))
-        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
-        return bits<target_size - 1, 0, signed_>(value);
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+        return bit<target_size - 1, 0, signed_>(value);
     }
 
     template <uint64_t target_size>
     requires(target_size == size)
-        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         return *this;
     }
 
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
     requires(target_size < size)
-        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         return slice<target_size - 1, 0>();
     }
 
     // native number, but extend to a big number
     template <uint64_t target_size>
     requires(target_size > size && !util::native_num(target_size) && native_num)
-        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
-        bits<target_size - 1, 0, signed_> result;
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+        bit<target_size - 1, 0, signed_> result;
         // use C++ default semantics to cast. if it's a negative number
-        // the upper bits will be set properly
+        // the upper bit will be set properly
         result.value.values[0] = static_cast<big_num_holder_type>(value);
         if constexpr (signed_) {
             if (negative()) {
@@ -1212,8 +1212,8 @@ public:
     // big number and gets extended to a big number
     template <uint64_t target_size>
     requires(target_size > size && !util::native_num(target_size) && !native_num)
-        [[nodiscard]] constexpr bits<target_size - 1, 0, signed_> extend() const {
-        bits<target_size - 1, 0, signed_> res;
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+        bit<target_size - 1, 0, signed_> res;
         res.value = value.template extend<target_size>();
         return res;
     }
@@ -1222,14 +1222,14 @@ public:
      * concatenation
      */
     template <int arg0_msb, int arg0_lsb, bool arg0_signed>
-    auto concat(const bits<arg0_msb, arg0_lsb, arg0_signed> &arg0) {
-        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb>::size;
+    auto concat(const bit<arg0_msb, arg0_lsb, arg0_signed> &arg0) {
+        auto constexpr arg0_size = bit<arg0_msb, arg0_lsb>::size;
         auto constexpr final_size = size + arg0_size;
         if constexpr (final_size < big_num_threshold) {
-            return bits<final_size - 1>(value << arg0_size | arg0.value);
+            return bit<final_size - 1>(value << arg0_size | arg0.value);
         } else {
-            auto res = bits<final_size - 1>();
-            if constexpr (bits<arg0_msb, arg0_lsb>::native_num) {
+            auto res = bit<final_size - 1>();
+            if constexpr (bit<arg0_msb, arg0_lsb>::native_num) {
                 // convert to big num
                 big_num<arg0_size, false> b(arg0.value);
                 auto big_num = value.concat(b);
@@ -1248,7 +1248,7 @@ public:
     }
 
     /*
-     * bits unpacking
+     * bit unpacking
      */
     template <typename... Ts>
     [[maybe_unused]] auto unpack(Ts &...args) const {
@@ -1291,8 +1291,8 @@ public:
     /*
      * bitwise operators
      */
-    bits<size - 1, 0, false> operator~() const {
-        bits<size - 1, 0, false> result;
+    bit<size - 1, 0, false> operator~() const {
+        bit<size - 1, 0, false> result;
         if constexpr (size == 1) {
             result.value = !value;
         } else {
@@ -1303,21 +1303,21 @@ public:
 
     template <int op_msb, int op_lsb, bool op_signed>
     requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template and_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator&(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator&(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value & op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto and_(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto and_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l & r;
@@ -1326,8 +1326,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bits<size - 1, 0, util::signed_result(signed_, op_signed)> &operator&=(
-        const bits<op_msb, op_lsb, op_signed> &op) {
+    bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator&=(
+        const bit<op_msb, op_lsb, op_signed> &op) {
         auto res = (*this) & op;
         value = res.value;
         mask_off();
@@ -1336,21 +1336,21 @@ public:
 
     template <int op_msb, int op_lsb, bool op_signed>
     requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template xor_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator^(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator^(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value ^ op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto xor_(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto xor_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l ^ r;
@@ -1359,8 +1359,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bits<size - 1, 0, util::signed_result(signed_, op_signed)> &operator^=(
-        const bits<op_msb, op_lsb, op_signed> &op) {
+    bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator^=(
+        const bit<op_msb, op_lsb, op_signed> &op) {
         auto res = (*this) ^ op;
         value = res.value;
         mask_off();
@@ -1369,21 +1369,21 @@ public:
 
     template <int op_msb, int op_lsb, bool op_signed>
     requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template or_<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator|(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator|(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value | op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto or_(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto or_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -1392,8 +1392,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bits<size - 1, 0, util::signed_result(signed_, op_signed)> &operator|=(
-        const bits<op_msb, op_lsb, op_signed> &op) {
+    bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator|=(
+        const bit<op_msb, op_lsb, op_signed> &op) {
         auto res = (*this) | op;
         value = res.value;
         mask_off();
@@ -1427,12 +1427,12 @@ public:
     [[maybe_unused]] [[nodiscard]] bool r_xnor() const { return !r_xor(); }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto operator>>(const bits<op_msb, op_lsb, op_signed> &amount) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> res;
+    auto operator>>(const bit<op_msb, op_lsb, op_signed> &amount) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
-            // make sure to mask off any bits dur to signed extension
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
+            // make sure to mask off any bit dur to signed extension
             res.value = (value >> static_cast<T>(amount.value)) & value_mask(size - amount.value);
         } else if constexpr ((!native_num)) {
             res.value = value >> amount.value;
@@ -1449,21 +1449,21 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bits<size - 1, 0, util::signed_result(signed_, op_signed)> &operator>>=(
-        const bits<op_msb, op_lsb, op_signed> &amount) {
+    bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator>>=(
+        const bit<op_msb, op_lsb, op_signed> &amount) {
         auto res = (*this) >> amount;
         value = res.value;
         return *this;
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto operator<<(const bits<op_msb, op_lsb, op_signed> &amount) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> res;
+    auto operator<<(const bit<op_msb, op_lsb, op_signed> &amount) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> res;
         // couple cases
         // 1. both of them are native number
         // clang doesn't allow accessing native_num as amount.native_num
         // see https://stackoverflow.com/a/44996066
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             res.value = value << static_cast<T>(amount.value);
         } else if constexpr ((!native_num)) {
             res.value = value << amount.value;
@@ -1480,19 +1480,19 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bits<size - 1, 0, util::signed_result(signed_, op_signed)> &operator<<=(
-        const bits<op_msb, op_lsb, op_signed> &amount) {
+    bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator<<=(
+        const bit<op_msb, op_lsb, op_signed> &amount) {
         auto res = (*this) << amount;
         value = res.value;
         return *this;
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto ashr(const bits<op_msb, op_lsb, op_signed> &amount) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> res;
+    auto ashr(const bit<op_msb, op_lsb, op_signed> &amount) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> res;
         // couple cases
         // 1. both of them are native number
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // no need to mask since C++ does arithmetic shifts by default
             res.value = value >> static_cast<T>(amount.value);
         } else if constexpr ((!native_num)) {
@@ -1510,14 +1510,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    auto ashl(const bits<op_msb, op_lsb, op_signed> &amount) const {
+    auto ashl(const bit<op_msb, op_lsb, op_signed> &amount) const {
         // this is the same as bitwise shift left
         return (*this) << amount;
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bool operator==(const bits<op_msb, op_lsb, op_signed> &v) const {
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+    bool operator==(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             return value == static_cast<T>(v.value);
         } else {
             return value == v.value;
@@ -1525,8 +1525,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bool operator>(const bits<op_msb, op_lsb, op_signed> &v) const {
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+    bool operator>(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // LRM specifies that on ly if both operands are signed we do signed comparison
             if constexpr (signed_ && op_signed) {
                 return value > v.value;
@@ -1539,8 +1539,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bool operator<(const bits<op_msb, op_lsb, op_signed> &v) const {
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+    bool operator<(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // LRM specifies that on ly if both operands are signed we do signed comparison
             if constexpr (signed_ && op_signed) {
                 return value < v.value;
@@ -1553,8 +1553,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bool operator>=(const bits<op_msb, op_lsb, op_signed> &v) const {
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+    bool operator>=(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // LRM specifies that on ly if both operands are signed we do signed comparison
             if constexpr (signed_ && op_signed) {
                 return value >= v.value;
@@ -1567,8 +1567,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    bool operator<=(const bits<op_msb, op_lsb, op_signed> &v) const {
-        if constexpr (native_num && bits<op_msb, op_lsb>::native_num) {
+    bool operator<=(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // LRM specifies that on ly if both operands are signed we do signed comparison
             if constexpr (signed_ && op_signed) {
                 return value <= v.value;
@@ -1580,11 +1580,11 @@ public:
         }
     }
 
-    constexpr bits<msb, lsb, signed_> operator-() const {
+    constexpr bit<msb, lsb, signed_> operator-() const {
         if constexpr (native_num) {
-            return bits<msb, lsb, signed_>(-value);
+            return bit<msb, lsb, signed_>(-value);
         } else {
-            return bits<msb, lsb, signed_>(value.negate());
+            return bit<msb, lsb, signed_>(value.negate());
         }
     }
 
@@ -1595,22 +1595,22 @@ public:
      */
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(bits<op_msb, op_lsb>::size != size) auto operator+(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+    requires(bit<op_msb, op_lsb>::size != size) auto operator+(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator+(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator+(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value + op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto add(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto add(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1619,22 +1619,22 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(bits<op_msb, op_lsb>::size != size) auto operator-(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+    requires(bit<op_msb, op_lsb>::size != size) auto operator-(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator-(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator-(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value - op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto minus(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto minus(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1643,22 +1643,22 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(bits<op_msb, op_lsb>::size != size) auto operator*(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+    requires(bit<op_msb, op_lsb>::size != size) auto operator*(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template multiply<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator*(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator*(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value * op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto multiply(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto multiply(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1667,22 +1667,22 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(bits<op_msb, op_lsb>::size != size) auto operator%(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+    requires(bit<op_msb, op_lsb>::size != size) auto operator%(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template mod<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator%(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator%(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value % op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto mod(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto mod(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1691,22 +1691,22 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(bits<op_msb, op_lsb>::size != size) auto operator/(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
-        auto constexpr target_size = util::max(size, bits<op_msb, op_lsb>::size);
+    requires(bit<op_msb, op_lsb>::size != size) auto operator/(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template divide<target_size, op_msb, op_lsb, op_signed>(op);
     }
 
     template <int op_lsb, bool op_signed>
-    auto operator/(const bits<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
-        bits<size - 1, 0, util::signed_result(signed_, op_signed)> result;
+    auto operator/(const bit<size - 1 + op_lsb, op_lsb, op_signed> &op) const {
+        bit<size - 1, 0, util::signed_result(signed_, op_signed)> result;
         result.value = value / op.value;
         return result;
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, bits<op_msb, op_lsb>::size)) auto divide(
-        const bits<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto divide(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -1714,10 +1714,10 @@ public:
         return result;
     }
 
-    [[nodiscard]] bits<size - 1, 0, true> to_signed() const {
-        bits<size - 1, 0, true> res;
+    [[nodiscard]] bit<size - 1, 0, true> to_signed() const {
+        bit<size - 1, 0, true> res;
         if constexpr (native_num) {
-            res.value = static_cast<decltype(bits<size - 1, 0, true>::value)>(value);
+            res.value = static_cast<decltype(bit<size - 1, 0, true>::value)>(value);
         } else {
             res.value = value.to_signed();
         }
@@ -1728,7 +1728,7 @@ public:
      * mask related stuff
      */
     [[nodiscard]] bool any_set() const requires(native_num) {
-        // unused bits are always set to 0
+        // unused bit are always set to 0
         return value != 0;
     }
 
@@ -1745,7 +1745,7 @@ public:
     /*
      * constructors
      */
-    explicit bits(std::string_view v) {
+    explicit bit(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
             value = 0;
@@ -1765,16 +1765,16 @@ public:
         }
     }
 
-    explicit constexpr bits(T v) requires(util::native_num(size)) : value(v) {}
+    explicit constexpr bit(T v) requires(util::native_num(size)) : value(v) {}
     template <typename K>
-    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bits(K v)
+    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bit(K v)
         : value(v) {}
 
     template <uint64_t new_size, bool new_signed>
-    explicit bits(const big_num<new_size, new_signed> &big_num) requires(size <= big_num_threshold)
+    explicit bit(const big_num<new_size, new_signed> &big_num) requires(size <= big_num_threshold)
         : value(big_num.values[0]) {}
 
-    bits() {
+    bit() {
         if constexpr (native_num) {
             // init to 0
             value = 0;
@@ -1784,7 +1784,7 @@ public:
 
     // implicit conversion via assignment
     template <int new_msb, int new_lsb, bool new_signed>
-    bits<msb, lsb, signed_> &operator=(const bits<new_msb, new_lsb, new_signed> &b) {
+    bit<msb, lsb, signed_> &operator=(const bit<new_msb, new_lsb, new_signed> &b) {
         value = b.value;
         return *this;
     }
@@ -1794,15 +1794,15 @@ private:
      * unpacking, which is basically slicing as syntax sugars
      */
     template <int base, int arg0_msb, int arg0_lsb, bool arg0_signed>
-    requires(base < size) void unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
-        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
+    requires(base < size) void unpack_(bit<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+        auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         arg0.value = this->template slice<base, upper_bound>();
     }
 
     template <int base = 0, int arg0_msb, int arg0_lsb, bool arg0_signed, typename... Ts>
-    [[maybe_unused]] auto unpack_(bits<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
-        auto constexpr arg0_size = bits<arg0_msb, arg0_lsb, arg0_signed>::size;
+    [[maybe_unused]] auto unpack_(bit<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
+        auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
         this->template unpack_<base, arg0_msb, arg0_lsb, arg0_signed>(arg0);
         this->template unpack_<base + arg0_size>(args...);
     }
@@ -1818,14 +1818,14 @@ template <int msb, int lsb, bool signed_>
 struct logic {
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;
-    bits<msb, lsb, signed_> value;
+    bit<msb, lsb, signed_> value;
     // To reduce memory footprint, we use the following encoding scheme
     // if xz_mask is off, value is the actual integer value
     // if xz_mask is on, 0 in value means x and 1 means z
-    bits<msb, lsb> xz_mask;
+    bit<msb, lsb> xz_mask;
 
     // make sure that if we use native number, it's an arithmetic type
-    static_assert((size <= 64 && std::is_arithmetic_v<typename bits<msb, lsb, signed_>::T>) ||
+    static_assert((size <= 64 && std::is_arithmetic_v<typename bit<msb, lsb, signed_>::T>) ||
                       (size > 64),
                   "Native number holder");
 
@@ -1989,7 +1989,7 @@ struct logic {
     }
 
     /*
-     * bits unpacking
+     * bit unpacking
      */
     template <typename... Ts>
     auto unpack(Ts &...args) const {
@@ -2504,14 +2504,14 @@ struct logic {
 
     template <typename T>
     requires(size <= big_num_threshold) explicit constexpr logic(T value)
-        : value(bits<msb, lsb, signed_>(value)) {}
+        : value(bit<msb, lsb, signed_>(value)) {}
 
     template <typename K>
     requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bits<msb, lsb, signed_>(value)) {}
+        : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bits<msb, lsb, signed_>(v)) {
+    explicit logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
         auto iter = v.rbegin();
         for (auto i = 0u; i < size; i++) {
             // from right to left
@@ -2530,8 +2530,8 @@ struct logic {
         }
     }
 
-    // conversion from bits to logic
-    constexpr explicit logic(bits<msb, lsb, signed_> &&b) : value(std::move(b)) {}
+    // conversion from bit to logic
+    constexpr explicit logic(bit<msb, lsb, signed_> &&b) : value(std::move(b)) {}
     // shifting msb and lsb
     template <int new_msb, int new_lsb, bool new_signed>
     requires(util::abs_diff(new_msb, new_lsb) ==
