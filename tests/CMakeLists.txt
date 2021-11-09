@@ -12,3 +12,4 @@ function(add_test target)
 endfunction()
 
 add_test(test_logic)
+add_test(test_array)

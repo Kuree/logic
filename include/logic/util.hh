@@ -62,6 +62,12 @@ constexpr auto reverse_tuple(T_R &&t) {
     (std::make_index_sequence<N>{});
 }
 
+// compute total size for packed array, which will be implemented as logics underneath
+template <uint64_t... nums>
+constexpr uint64_t total_size() {
+    return (nums + ...);
+}
+
 template <uint64_t s, bool signed_, typename enable = void>
 struct get_holder_type;
 
