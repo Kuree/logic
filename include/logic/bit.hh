@@ -16,6 +16,8 @@ public:
     constexpr static auto big_endian = msb > lsb;
     static_assert(size > 0, "0 sized logic not allowed");
     static constexpr bool native_num = util::native_num(size);
+    constexpr static auto is_signed = signed_;
+    constexpr static bool is_4state = false;
     using T = typename util::get_holder_type<size, signed_>::type;
 
     T value;
@@ -24,7 +26,7 @@ public:
     [[nodiscard]] std::string str() const {
         std::stringstream ss;
         for (auto i = 0; i < size; i++) {
-            if (operator[](i)) {
+            if (get_(i)) {
                 ss << '1';
             } else {
                 ss << '0';
@@ -34,16 +36,7 @@ public:
     }
 
     // single bit
-    bool inline operator[](uint64_t idx) const requires(!array) {
-        if constexpr (!big_endian) {
-            idx = lsb - idx;
-        }
-        if constexpr (native_num) {
-            return (value >> idx) & 1;
-        } else {
-            return value[idx];
-        }
-    }
+    bool inline operator[](uint64_t idx) const requires(!array) { return get_(idx); }
 
     template <uint64_t idx>
     requires(idx < size && native_num) [[nodiscard]] bool inline get() const requires(!array) {
@@ -822,6 +815,35 @@ private:
         auto mask = std::numeric_limits<uint64_t>::max();
         mask = mask >> (64ull - requested_size);
         return static_cast<T>(mask);
+    }
+
+    [[nodiscard]] inline bool get_(int idx) const {
+        if constexpr (!big_endian) {
+            idx = lsb - idx;
+        }
+        if constexpr (native_num) {
+            return (value >> idx) & 1;
+        } else {
+            return value[idx];
+        }
+    }
+
+    template <int idx>
+    [[nodiscard]] inline bool get_() const {
+        if constexpr (!big_endian) {
+            constexpr auto idx_ = lsb - idx;
+            if constexpr (native_num) {
+                return (value >> idx_) & 1;
+            } else {
+                return value.template get<idx_>();
+            }
+        } else {
+            if constexpr (native_num) {
+                return (value >> idx) & 1;
+            } else {
+                return value.template get<idx>();
+            }
+        }
     }
 };
 }  // namespace logic

@@ -9,6 +9,8 @@ template <int msb, int lsb, bool signed_, bool array>
 struct logic {
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;
+    constexpr static auto is_signed = signed_;
+    constexpr static bool is_4state = true;
     bit<msb, lsb, signed_> value;
     // To reduce memory footprint, we use the following encoding scheme
     // if xz_mask is off, value is the actual integer value

@@ -5,25 +5,25 @@
 
 namespace logic {
 
-template <typename T, int msb, int lsb>
-class packed_array {};
+namespace util {
+template <typename T, int msb, int lsb, bool is_logic>
+struct get_base_array_type;
 
-template <int msb, int lsb, int target_msb, int target_lsb = target_msb, bool target_signed = false>
-class packed_array_bits
-    : public logic<util::total_size(msb, lsb) * util::total_size(target_msb, target_lsb),
-                   target_signed, true>,
-      public packed_array<packed_array_bits<msb, lsb, target_msb, target_lsb, target_signed>, msb,
-                          lsb> {
-public:
+template <typename T, int msb, int lsb>
+struct get_base_array_type<T, msb, lsb, true> {
+    using type = logic<util::total_size(msb, lsb) * T::size - 1, 0, T::is_signed, true>;
 };
 
-template <int msb, int lsb, int target_msb, int target_lsb = target_msb, bool target_signed = false>
-class packed_array_logic
-    : public logic<util::total_size(msb, lsb) * util::total_size(target_msb, target_lsb),
-                   target_signed, true>,
-      public packed_array<packed_array_bits<msb, lsb, target_msb, target_lsb, target_signed>, msb,
-                          lsb> {
-public:
+template <typename T, int msb, int lsb>
+struct get_base_array_type<T, msb, lsb, false> {
+    using type = bit<util::total_size(msb, lsb) * T::size - 1, 0, T::is_signed, true>;
+};
+}  // namespace util
+
+template <typename T, int msb, int lsb>
+class packed_array : public util::get_base_array_type<T, msb, lsb, T::is_4state>::type {
+    // compute the base size
+    static constexpr auto base_size = T::size;
 };
 
 }  // namespace logic
