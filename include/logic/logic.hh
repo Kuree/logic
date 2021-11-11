@@ -729,12 +729,7 @@ public:
     constexpr logic() { xz_mask.mask(); }
 
     template <typename T>
-    requires(size <= big_num_threshold) explicit constexpr logic(T value)
-        : value(bit<msb, lsb, signed_>(value)) {}
-
-    template <typename K>
-    requires(std::is_arithmetic_v<K> &&size > big_num_threshold) explicit constexpr logic(K value)
-        : value(bit<msb, lsb, signed_>(value)) {}
+    explicit constexpr logic(T value) : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit constexpr logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
