@@ -1000,7 +1000,6 @@ TEST(logic, gt) {  // NOLINT
 }
 
 TEST(logic, update) {   // NOLINT
-    /*
     {
         // native number exact
         logic::logic<15, 0> a;
@@ -1050,7 +1049,6 @@ TEST(logic, update) {   // NOLINT
         for (auto i = 0; i < 96; i++) ss << 'x';
         EXPECT_EQ(a.str(), ss.str());
     }
-*/
 
     {
         // little endian mixed
