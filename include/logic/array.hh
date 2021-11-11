@@ -101,13 +101,12 @@ public:
     auto update(const V v) {
         if (idx >= size) return;
         // need to compute the base
-        auto constexpr i = idx -  util::min(msb, lsb);
+        auto constexpr i = idx - util::min(msb, lsb);
         // use the underlying logic implementation
         value[i] = v;
     }
 
 private:
-
 };
 
 }  // namespace logic

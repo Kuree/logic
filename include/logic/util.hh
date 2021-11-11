@@ -66,9 +66,7 @@ constexpr bool match_endian(int op1_hi, int op1_lo, int op2_hi, int op2_lo) {
     return ((op1_hi >= op1_lo) && (op2_hi >= op2_lo)) || ((op1_hi < op1_lo) && (op2_hi < op2_lo));
 }
 
-constexpr uint64_t total_size(int msb, int lsb) {
-    return abs_diff(msb, lsb) + 1;
-}
+constexpr uint64_t total_size(int msb, int lsb) { return abs_diff(msb, lsb) + 1; }
 
 template <uint64_t s, bool signed_, typename enable = void>
 struct get_holder_type;
