@@ -24,7 +24,12 @@ struct logic {
     [[nodiscard]] std::string str() const {
         std::stringstream ss;
         for (auto i = 0u; i < size; i++) {
-            uint64_t idx = size - i - 1;
+            uint64_t idx;
+            if constexpr (big_endian) {
+                idx = size - i - 1;
+            } else {
+                idx = i;
+            }
             if (x_set(idx)) {
                 ss << 'x';
             } else if (z_set(idx)) {
@@ -43,25 +48,27 @@ struct logic {
     /*
      * single bit
      */
-    inline logic operator[](uint64_t idx) const {
+    inline logic<0> operator[](uint64_t idx) const {
         if (idx < size) [[likely]] {
-            logic r;
+            logic<0> r;
             if (x_set(idx)) [[unlikely]] {
                 r.set_x(idx);
             } else if (z_set(idx)) [[unlikely]] {
                 r.set_z(idx);
             } else {
-                r.value = value[idx];
+                r.value.value = value[idx];
+                r.xz_mask.value = false;
             }
             return r;
         } else {
-            return logic(false);
+            // return X
+            return logic<0>{};
         }
     }
 
     template <uint64_t idx>
     requires(idx < size) [[nodiscard]] inline logic get() const {
-        logic r;
+        logic<0> r;
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
         } else if (this->template z_set<idx>()) [[unlikely]] {
@@ -90,9 +97,10 @@ struct logic {
         this->template unmask_bit<idx>();
     }
 
-    void set(uint64_t idx, const logic &l) {
-        value.set(idx, l.value[idx]);
-        xz_mask.set(idx, l.xz_mask[idx]);
+    template <bool l_signed>
+    void set(uint64_t idx, const logic<0, 0, l_signed> &l) {
+        value.set(idx, l.value.value);
+        xz_mask.set(idx, l.xz_mask.value);
     }
 
     [[nodiscard]] inline bool x_set(uint64_t idx) const { return xz_mask[idx] && !value[idx]; }
@@ -688,6 +696,30 @@ struct logic {
     }
 
     /*
+     * update using slice
+     */
+    // setting values
+    template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
+    void update(const logic<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size &&
+                                                                   util::match_endian(hi, lo, msb,
+                                                                                      lsb)) {
+        auto constexpr start = util::min(hi, lo);
+        auto constexpr end = util::max(hi, lo) + 1;
+        for (auto i = start; i < end; i++) {
+            // notice that if it is out of range, 0 will be returned
+            // we need to revert the index accessing scheme here, if the endian doesn't match
+            uint64_t idx;
+            if constexpr (logic<op_hi, op_lo, op_signed>::big_endian ^ big_endian) {
+                idx = util::max(op_lo, op_hi) - i;
+            } else {
+                idx = i;
+            }
+            auto b = op.operator[](idx);
+            set(i, b);
+        }
+    }
+
+    /*
      * constructors
      */
     // by default everything is x
@@ -702,23 +734,8 @@ struct logic {
         : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
-        auto iter = v.rbegin();
-        for (auto i = 0u; i < size; i++) {
-            // from right to left
-            auto c = *iter;
-            switch (c) {
-                case 'x':
-                    set_x(i);
-                    break;
-                case 'z':
-                    set_z(i);
-                    break;
-                default:;
-            }
-            iter++;
-            if (iter == v.rend()) break;
-        }
+    explicit constexpr logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
+        parse_bits(v.rbegin(), v.rend());
     }
 
     // conversion from bit to logic
@@ -737,6 +754,27 @@ private:
     template <uint64_t idx>
     void unmask_bit() {
         xz_mask.template set<idx, false>();
+    }
+
+    // set bits
+    template <typename T>
+    void parse_bits(T begin, T end) {
+        auto iter = begin;
+        for (auto i = 0u; i < size; i++) {
+            // from right to left
+            auto c = *iter;
+            switch (c) {
+                case 'x':
+                    set_x(i);
+                    break;
+                case 'z':
+                    set_z(i);
+                    break;
+                default:;
+            }
+            iter++;
+            if (iter == end) break;
+        }
     }
 
     /*

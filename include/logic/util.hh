@@ -62,6 +62,10 @@ constexpr auto reverse_tuple(T_R &&t) {
     (std::make_index_sequence<N>{});
 }
 
+constexpr bool match_endian(int op1_hi, int op1_lo, int op2_hi, int op2_lo) {
+    return ((op1_hi >= op1_lo) && (op2_hi >= op2_lo)) || ((op1_hi < op1_lo) && (op2_hi < op2_lo));
+}
+
 // compute total size for packed array, which will be implemented as logics underneath
 template <uint64_t... nums>
 constexpr uint64_t total_size() {

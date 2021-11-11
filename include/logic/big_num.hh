@@ -49,10 +49,14 @@ public:
     }
 
     template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] bool inline get() const {
-        auto a = idx / big_num_threshold;
-        auto b = idx % big_num_threshold;
-        return (values[a] >> b) & 1;
+    [[nodiscard]] bool inline get() const {
+        if constexpr (idx >= size) {
+            return false;
+        } else {
+            auto a = idx / big_num_threshold;
+            auto b = idx % big_num_threshold;
+            return (values[a] >> b) & 1;
+        }
     }
 
     // single bit
@@ -859,19 +863,11 @@ public:
     }
 
     // constructors
-    constexpr explicit big_num(std::string_view v) {
-        std::fill(values.begin(), values.end(), 0);
-        auto iter = v.rbegin();
-        for (auto i = 0u; i < size; i++) {
-            // from right to left
-            auto &value = values[i / big_num_threshold];
-            auto c = *iter;
-            if (c == '1') {
-                value |= 1ull << (i % big_num_threshold);
-            }
-            iter++;
-            if (iter == v.rend()) break;
-        }
+    constexpr explicit big_num(std::string_view v) : big_num(v.rbegin(), v.rend()) {}
+
+    template <typename T>
+    constexpr big_num(T begin, T end) {
+        parse_bits(begin, end);
     }
 
     template <typename T>
@@ -898,7 +894,23 @@ public:
 
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
+
+    template <typename T>
+    void parse_bits(T begin, T end) {
+        std::fill(values.begin(), values.end(), 0);
+        auto iter = begin;
+        for (auto i = 0u; i < size; i++) {
+            // from right to left
+            auto &value = values[i / big_num_threshold];
+            auto c = *iter;
+            if (c == '1') {
+                value |= 1ull << (i % big_num_threshold);
+            }
+            iter++;
+            if (iter == end) break;
+        }
+    }
 };
-}
+}  // namespace logic
 
 #endif  // LOGIC_BIG_NUM_HH

@@ -998,3 +998,69 @@ TEST(logic, gt) {  // NOLINT
         EXPECT_TRUE(a > b);
     }
 }
+
+TEST(logic, update) {   // NOLINT
+    /*
+    {
+        // native number exact
+        logic::logic<15, 0> a;
+        logic::logic<3, 0> b{"1010"};
+        a.update<3, 0>(b);
+        EXPECT_EQ(a.str(), "xxxxxxxxxxxx1010");
+    }
+
+    {
+        // native number smaller
+        logic::logic<15, 0> a;
+        logic::logic<3, 0> b{"1010"};
+        a.update<1, 0>(b);
+        EXPECT_EQ(a.str(), "xxxxxxxxxxxxxx10");
+    }
+
+    {
+        // native number smaller
+        logic::logic<15, 0> a;
+        logic::logic<3, 0> b{"1010"};
+        a.update<9, 0>(b);
+        EXPECT_EQ(a.str(), "xxxxxx0000001010");
+    }
+
+    {
+        // big number
+        // should work since it's goes through the same function calls as the native number
+        logic::logic<100 - 1, 0> a;
+        auto constexpr ref = "1010";
+        logic::logic<3, 0> b{ref};
+        a.update<3, 0>(b);
+        std::stringstream ss;
+        for (auto i = 0; i < 96; i++) ss << 'x';
+        ss << ref;
+        EXPECT_EQ(a.str(), ss.str());
+    }
+
+
+    {
+        // little endian
+        logic::logic<0, 99> a;
+        auto constexpr ref = "1110";
+        logic::logic<0, 3> b{ref};
+        a.update<0, 3>(b);
+        std::stringstream ss;
+        ss << ref;
+        for (auto i = 0; i < 96; i++) ss << 'x';
+        EXPECT_EQ(a.str(), ss.str());
+    }
+*/
+
+    {
+        // little endian mixed
+        logic::logic<0, 99> a;
+        auto constexpr ref = "1110";
+        logic::logic<3, 0> b{ref};
+        a.update<0, 3>(b);
+        std::stringstream ss;
+        ss << ref;
+        for (auto i = 0; i < 96; i++) ss << 'x';
+        EXPECT_EQ(a.str(), ss.str());
+    }
+}

@@ -35,12 +35,12 @@ public:
 
     // single bit
     bool inline operator[](uint64_t idx) const {
+        if constexpr (!big_endian) {
+            idx = lsb - idx;
+        }
         if constexpr (native_num) {
             return (value >> idx) & 1;
         } else {
-            if constexpr (!big_endian) {
-                idx = lsb - idx;
-            }
             return value[idx];
         }
     }
@@ -728,22 +728,34 @@ public:
     }
 
     /*
+     * update using slice
+     */
+    // setting values
+    template <uint64_t hi, uint64_t lo = hi, uint64_t op_hi, uint64_t op_lo, bool op_signed>
+    void update(const bit<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size) {
+        auto constexpr start = util::min(hi, lo);
+        auto constexpr end = util::max(hi, lo) + 1;
+        for (auto i = start; i < end; i++) {
+            // notice that if it is out of range, 0 will be returned
+            // we need to revert the index accessing scheme here, if the endian doesn't match
+            uint64_t idx;
+            if constexpr (bit<op_hi, op_lo>::big_endian ^ big_endian) {
+                idx = util::max(op_lo, op_hi) - i;
+            } else {
+                idx = i;
+            }
+            auto b = op.operator[](idx);
+            set(i, b);
+        }
+    }
+
+    /*
      * constructors
      */
-    explicit bit(std::string_view v) {
+    explicit constexpr bit(std::string_view v) {
         if constexpr (size <= big_num_threshold) {
             // normal number
-            value = 0;
-            auto iter = v.rbegin();
-            for (auto i = 0u; i < size; i++) {
-                // from right to left
-                auto c = *iter;
-                if (c == '1') {
-                    value |= 1ull << i;
-                }
-                iter++;
-                if (iter == v.rend()) break;
-            }
+            parse_bits(v.rbegin(), v.rend());
         } else {
             // big num
             value = big_num<size, signed_>(v);
@@ -775,6 +787,20 @@ public:
     }
 
 private:
+    template <typename T>
+    void parse_bits(T begin, T end) {
+        value = 0;
+        auto iter = begin;
+        for (auto i = 0u; i < size; i++) {
+            // from right to left
+            auto c = *iter;
+            if (c == '1') {
+                value |= 1ull << i;
+            }
+            iter++;
+            if (iter == end) break;
+        }
+    }
     /*
      * unpacking, which is basically slicing as syntax sugars
      */
