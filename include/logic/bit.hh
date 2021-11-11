@@ -10,7 +10,6 @@ struct logic;
 
 template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct bit {
-private:
 public:
     constexpr static auto size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;

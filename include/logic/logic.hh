@@ -7,6 +7,7 @@ namespace logic {
 
 template <int msb, int lsb, bool signed_, bool array>
 struct logic {
+public:
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;
     constexpr static auto is_signed = signed_;
@@ -101,8 +102,7 @@ struct logic {
 
     template <bool l_signed>
     void set(uint64_t idx, const logic<0, 0, l_signed> &l) requires(!array) {
-        value.set(idx, l.value.value);
-        xz_mask.set(idx, l.xz_mask.value);
+        set_(idx, l);
     }
 
     [[nodiscard]] inline bool x_set(uint64_t idx) const { return xz_mask[idx] && !value[idx]; }
@@ -718,7 +718,7 @@ struct logic {
                 idx = i;
             }
             auto b = op.operator[](idx);
-            set(i, b);
+            set_(i, b);
         }
     }
 
@@ -822,6 +822,12 @@ private:
         r.value.value = false;
         r.xz_mask.value = false;
         return r;
+    }
+
+    template <bool l_signed>
+    void set_(uint64_t idx, const logic<0, 0, l_signed> &l) {
+        value.set(idx, l.value.value);
+        xz_mask.set(idx, l.xz_mask.value);
     }
 };
 
