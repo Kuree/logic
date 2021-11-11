@@ -20,7 +20,7 @@ TEST(array, ctor) {  // NOLINT
     EXPECT_EQ(sizeof(logic_arrays), 4 * 4 * 2);
 }
 
-TEST(array, slice) {    // NOLINT
+TEST(array, slice) {  // NOLINT
     {
         // big number returns big number
         std::stringstream ss;
@@ -42,7 +42,7 @@ TEST(array, slice) {    // NOLINT
     }
 }
 
-TEST(array, update) {   // NOLINT
+TEST(array, update) {  // NOLINT
     using namespace logic::literals;
     {
         logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array;
@@ -52,4 +52,12 @@ TEST(array, update) {   // NOLINT
         for (auto i = 0; i < 16 * 2; i++) ss << '0';
         EXPECT_EQ(ss.str(), logic_array.str());
     }
+}
+
+TEST(unpacked_array, slice) {  // NOLINT
+    logic::unpacked_array<logic::logic<15, 0>, 3, 0> logic_array;
+    auto v = logic::logic<15, 0>(std::numeric_limits<uint16_t>::max());
+    logic_array.update<1>(v);
+    auto const &slice = logic_array[1];
+    EXPECT_TRUE(slice == v);
 }

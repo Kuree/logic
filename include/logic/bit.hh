@@ -773,7 +773,7 @@ public:
 
     // implicit conversion via assignment
     template <int new_msb, int new_lsb, bool new_signed>
-    bit<msb, lsb, signed_> &operator=(const bit<new_msb, new_lsb, new_signed> &b) {
+    bit &operator=(const bit<new_msb, new_lsb, new_signed> &b) {
         value = b.value;
         return *this;
     }

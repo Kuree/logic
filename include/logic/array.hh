@@ -35,7 +35,7 @@ struct get_array_base_type<T, size, false> {
 }  // namespace util
 
 template <typename T, int msb, int lsb>
-class packed_array : public util::get_array_type<T, msb, lsb, T::is_4state>::type {
+struct packed_array : public util::get_array_type<T, msb, lsb, T::is_4state>::type {
 private:
     constexpr static int get_slice_size(int hi, int lo) {
         return base_size * util::total_size(hi, lo);
@@ -79,6 +79,35 @@ public:
     explicit packed_array(std::string_view v) : VT(v) {}
 
     packed_array() = default;
+};
+
+template <typename T, int msb, int lsb>
+struct unpacked_array {
+public:
+    static constexpr auto size = util::total_size(msb, lsb);
+    std::array<T, size> value;
+
+    const T &operator[](int idx) const {
+        const static T x_ = T{};
+        auto i = static_cast<uint32_t>(idx - util::min(msb, lsb));
+        if (i >= size) {
+            return x_;
+        } else {
+            return value[i];
+        }
+    }
+
+    template <int idx, typename V>
+    auto update(const V v) {
+        if (idx >= size) return;
+        // need to compute the base
+        auto constexpr i = idx -  util::min(msb, lsb);
+        // use the underlying logic implementation
+        value[i] = v;
+    }
+
+private:
+
 };
 
 }  // namespace logic
