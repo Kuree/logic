@@ -5,10 +5,10 @@
 
 namespace logic {
 
-template <int msb = 0, int lsb = 0, bool signed_ = false>
+template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct logic;
 
-template <int msb = 0, int lsb = 0, bool signed_ = false>
+template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct bit {
 private:
 public:
@@ -34,7 +34,7 @@ public:
     }
 
     // single bit
-    bool inline operator[](uint64_t idx) const {
+    bool inline operator[](uint64_t idx) const requires(!array) {
         if constexpr (!big_endian) {
             idx = lsb - idx;
         }
@@ -46,7 +46,7 @@ public:
     }
 
     template <uint64_t idx>
-    requires(idx < size && native_num) [[nodiscard]] bool inline get() const {
+    requires(idx < size && native_num) [[nodiscard]] bool inline get() const requires(!array) {
         return this->operator[](idx);
     }
 
@@ -66,7 +66,7 @@ public:
     }
 
     template <uint64_t idx>
-    void set(bool v) {
+    void set(bool v) requires(!array) {
         constexpr auto i = !big_endian ? lsb - idx : idx;
         if constexpr (native_num) {
             if (v) {
@@ -80,7 +80,7 @@ public:
     }
 
     template <uint64_t idx, bool v>
-    void set() {
+    void set() requires(!array) {
         constexpr auto i = !big_endian ? lsb - idx : idx;
         if constexpr (big_endian) {
             if constexpr (v) {
@@ -112,7 +112,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
-    constexpr inline slice() const {
+    constexpr inline slice() const requires(!array) {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto base = util::min(msb, lsb);
         constexpr auto max = util::max(a, b) - base;
@@ -132,7 +132,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const {
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const requires(!array) {
         bit<util::abs_diff(a, b), false> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
@@ -145,7 +145,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && !native_num && !util::native_num(util::abs_diff(a, b)) &&
-             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const {
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const requires(!array) {
         bit<util::abs_diff(a, b), false> result;
         result.value = value.template slice<a, b>();
         return result;

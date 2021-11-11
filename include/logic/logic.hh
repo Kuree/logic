@@ -5,7 +5,7 @@
 
 namespace logic {
 
-template <int msb, int lsb, bool signed_>
+template <int msb, int lsb, bool signed_, bool array>
 struct logic {
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
     constexpr static auto big_endian = msb > lsb;
@@ -67,7 +67,7 @@ struct logic {
     }
 
     template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] inline logic get() const {
+    requires(idx < size) [[nodiscard]] inline logic get() const requires(!array) {
         logic<0> r;
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
@@ -79,26 +79,26 @@ struct logic {
         return r;
     }
 
-    void set(uint64_t idx, bool v) {
+    void set(uint64_t idx, bool v) requires(!array) {
         value.set(idx, v);
         // unmask bit
         unmask_bit(idx);
     }
 
     template <uint64_t idx>
-    void set(bool v) {
+    void set(bool v) requires(!array) {
         value.template set<idx>(v);
         this->template unmask_bit<idx>();
     }
 
     template <uint64_t idx, bool v>
-    void set() {
+    void set() requires(!array) {
         value.template set<idx, v>();
         this->template unmask_bit<idx>();
     }
 
     template <bool l_signed>
-    void set(uint64_t idx, const logic<0, 0, l_signed> &l) {
+    void set(uint64_t idx, const logic<0, 0, l_signed> &l) requires(!array) {
         value.set(idx, l.value.value);
         xz_mask.set(idx, l.xz_mask.value);
     }
@@ -143,7 +143,8 @@ struct logic {
      * slices
      */
     template <int a, int b>
-    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice() const {
+    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice() const
+        requires(!array) {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access will be X
             return logic<util::abs_diff(a, b)>{};
