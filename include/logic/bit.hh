@@ -714,6 +714,17 @@ public:
         return res;
     }
 
+    [[nodiscard]] bit<size - 1, 0, false> to_unsigned() const {
+        bit<size - 1, 0, false> res;
+        if constexpr (native_num) {
+            res.value = static_cast<decltype(bit<size - 1, 0, false>::value)>(value);
+        } else {
+            // big number is always unsigned
+            res.value = value;
+        }
+        return res;
+    }
+
     /*
      * mask related stuff
      */

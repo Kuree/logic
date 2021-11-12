@@ -706,9 +706,16 @@ public:
         return result;
     }
 
-    [[nodiscard]] logic<size - 1, 0, true> to_signed() const {
+    [[nodiscard]] constexpr logic<size - 1, 0, true> to_signed() const {
         logic<size - 1, 0, true> result;
         result.value = value.to_signed();
+        result.xz_mask = xz_mask;
+        return result;
+    }
+
+    [[nodiscard]] constexpr logic<size - 1, 0, false> to_unsigned() const {
+        logic<size - 1, 0, false> result;
+        result.value = value.to_unsigned();
         result.xz_mask = xz_mask;
         return result;
     }
@@ -745,7 +752,14 @@ public:
              util::abs_diff(msb,
                             lsb)) explicit logic(const logic<new_msb, new_lsb, new_signed> &target)
         : value(target.value), xz_mask(target.xz_mask) {}
-    // safe conversions
+
+    // implicit conversion via assignment
+    template <int new_msb, int new_lsb, bool new_signed>
+    logic &operator=(const logic<new_msb, new_lsb, new_signed> &b) {
+        value = b.value;
+        xz_mask = b.xz_mask;
+        return *this;
+    }
 
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }

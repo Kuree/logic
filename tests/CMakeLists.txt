@@ -13,3 +13,4 @@ endfunction()
 
 add_test(test_logic)
 add_test(test_array)
+add_test(test_struct)
