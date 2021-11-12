@@ -11,8 +11,8 @@ struct test_a : logic::packed_struct<10> {
     }
 
     template <typename T, typename K = T>
-    static auto a(const T &v, const K &k) {
-        return v.template update<4, 0>(k);
+    static void a(T &v, const K &k) {
+        v.template update<4, 0>(k);
     }
 
     template <typename T>
@@ -21,8 +21,8 @@ struct test_a : logic::packed_struct<10> {
     }
 
     template <typename T, typename K = T>
-    static auto b(const T &v, const K &k) {
-        return v.template update<9, 5>(k);
+    static void b(T &v, const K &k) {
+        v.template update<9, 5>(k);
     }
 };
 
