@@ -92,6 +92,19 @@ public:
         return res;
     }
 
+    // this is inefficient since we don't know what the values are during runtime
+    template <uint32_t target_size>
+    big_num<target_size, false> slice(uint64_t a, uint64_t b) const {
+        auto start = util::min(a, b);
+        auto end = util::max(a, b);
+        big_num<target_size, false> result;
+
+        for (auto i = start; i <= end; i++) {
+            result.set(i - start, get(i));
+        }
+        return result;
+    }
+
     template <uint64_t op_size>
     big_num<op_size, signed_> extend() const {
         if constexpr (op_size > size) {

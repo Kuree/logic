@@ -25,7 +25,13 @@ public:
     [[nodiscard]] std::string str() const {
         std::stringstream ss;
         for (auto i = 0; i < size; i++) {
-            if (get_(i)) {
+            uint64_t idx;
+            if constexpr (big_endian) {
+                idx = size - i - 1;
+            } else {
+                idx = i;
+            }
+            if (get_(idx)) {
                 ss << '1';
             } else {
                 ss << '0';
@@ -40,6 +46,21 @@ public:
     template <uint64_t idx>
     requires(idx < size && native_num) [[nodiscard]] bool inline get() const requires(!array) {
         return this->operator[](idx);
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed, bool op_array>
+    bool inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
+        uint64_t index;
+        if constexpr (bit<op_msb, op_lsb>::native_num) {
+            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+        } else {
+            if (op.fit_in_64()) {
+                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+            } else {
+                return false;
+            }
+        }
+        return get_(index);
     }
 
     void inline set(uint64_t idx, bool v) {
@@ -74,7 +95,7 @@ public:
     template <uint64_t idx, bool v>
     void set() requires(!array) {
         constexpr auto i = !big_endian ? lsb - idx : idx;
-        if constexpr (big_endian) {
+        if constexpr (native_num) {
             if constexpr (v) {
                 value |= 1ull << i;
             } else {
@@ -88,7 +109,7 @@ public:
     /*
      * relates to whether it's negative or not
      */
-    [[nodiscard]] bool negative() const requires(signed_) {
+    [[nodiscard]] bool negative() const {
         if constexpr (native_num) {
             return value < 0;
         } else {
@@ -104,20 +125,7 @@ public:
      */
     template <int a, int b>
     requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
-    constexpr inline slice() const requires(!array) {
-        // assume the import has type-checked properly, e.g. by a compiler
-        constexpr auto base = util::min(msb, lsb);
-        constexpr auto max = util::max(a, b) - base;
-        constexpr auto min = util::min(a, b) - base;
-        constexpr auto t_size = sizeof(T) * 8;
-        bit<util::abs_diff(a, b), false> result;
-        constexpr auto default_mask = std::numeric_limits<T>::max();
-        uint64_t mask = default_mask << min;
-        mask &= (default_mask >> (t_size - max - 1));
-        result.value = (value & mask) >> min;
-
-        return result;
-    }
+    constexpr inline slice() const requires(!array) { return this->template slice_<a, b>(); }
 
     /*
      * big number but small slice
@@ -141,6 +149,11 @@ public:
         bit<util::abs_diff(a, b), false> result;
         result.value = value.template slice<a, b>();
         return result;
+    }
+
+    template <uint32_t size>
+    auto slice(int a, int b) const {
+        return this->template slice_<size>(a, b);
     }
 
     // extension
@@ -844,7 +857,85 @@ private:
             }
         }
     }
+
+protected:
+    template <int a, int b>
+    requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
+    constexpr inline slice_() const {
+        // assume the import has type-checked properly, e.g. by a compiler
+        constexpr auto base = util::min(msb, lsb);
+        constexpr auto max = util::max(a, b) - base;
+        constexpr auto min = util::min(a, b) - base;
+        constexpr auto t_size = sizeof(T) * 8;
+        bit<util::abs_diff(a, b), false> result;
+        constexpr auto default_mask = std::numeric_limits<T>::max();
+        uint64_t mask = default_mask << min;
+        mask &= (default_mask >> (t_size - max - 1));
+        result.value = (value & mask) >> min;
+
+        return result;
+    }
+
+    template <uint32_t target_size>
+    auto slice_(int a, int b) const {
+        bit<target_size - 1, false> result;
+        if constexpr (native_num) {
+            // assume the import has type-checked properly, e.g. by a compiler
+            auto base = util::min(msb, lsb);
+            auto max = util::max(a, b) - base;
+            auto min = util::min(a, b) - base;
+            auto t_size = sizeof(T) * 8;
+            constexpr auto default_mask = std::numeric_limits<T>::max();
+            uint64_t mask = default_mask << min;
+            mask &= (default_mask >> (t_size - max - 1));
+            result.value = (value & mask) >> min;
+
+            return result;
+        } else {
+            // may need to shrink
+            auto v = value.template slice<target_size>(a, b);
+            if constexpr (util::native_num(target_size)) {
+                result.value = static_cast<decltype(result.value)>(v.values[0]);
+            } else {
+                result.value = v;
+            }
+        }
+        return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    void update_(int hi, int lo, const bit<op_msb, op_lsb, op_signed> &op) {
+        auto start = util::min(hi, lo);
+        auto end = util::max(hi, lo) + 1;
+        for (auto i = start; i < end; i++) {
+            // notice that if it is out of range, 0 will be returned
+            // we need to revert the index accessing scheme here, if the endian doesn't match
+            uint64_t idx;
+            if constexpr (bit<op_msb, op_lsb>::big_endian ^ big_endian) {
+                idx = util::max(op_lsb, op_msb) - i;
+            } else {
+                idx = i;
+            }
+            auto b = op.operator[](idx - start);
+            set(i, b);
+        }
+    }
 };
+
+inline namespace literals {
+// constexpr to parse SystemVerilog literals
+// per LRM, if size not specified, the default size is 32
+//     it will be signed as well
+// in C++ we only allow unsigned integer. as a result, we will create a number that's
+// 1 bit less to account for negative number
+constexpr bit<31, 0, true> operator""_bit(unsigned long long value) {
+    return bit<30, 0, true>(static_cast<int32_t>(value)).extend<32>();
+}
+constexpr bit<63, 0, true> operator""_bit64(unsigned long long value) {
+    return bit<62, 0, true>(static_cast<int64_t>(value)).extend<64>();
+}
+}  // namespace literals
+
 }  // namespace logic
 
 #endif  // LOGIC_BIT_HH

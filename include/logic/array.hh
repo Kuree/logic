@@ -45,12 +45,12 @@ private:
 public:
     // compute the base size
     static constexpr auto base_size = T::size;
-    static constexpr auto size = base_size * (util::abs_diff(msb, lsb) + 1);
-    static constexpr auto native_num = util::native_num(size);
+    static constexpr auto array_size = base_size * (util::abs_diff(msb, lsb) + 1);
+    static constexpr auto native_num = util::native_num(array_size);
     static constexpr bool is_4state = T::is_4state;
 
     template <int hi, int lo>
-    auto slice() {
+    auto slice_array() const {
         // typename util::get_array_base_type<T, get_slice_size(hi, lo), T::is_4state>::type result;
         // copy values over
         // maybe use SIMD to copy?
@@ -60,18 +60,60 @@ public:
         auto constexpr start_addr = min_idx * base_size;
         auto constexpr end_addr = (max_idx + 1) * base_size;
 
-        return VT::value.template slice<end_addr - 1, start_addr>();
+        return VT::template slice_<end_addr - 1, start_addr>();
     }
 
+    // Clion linter goes crazy here, even though it's hiding since the base class requires
+    // not an array
     template <int hi, int lo, typename V>
-    auto update(const V v) {
+    auto update(V &&v) {
         // need to compute the base
         auto constexpr min_idx = util::min(hi, lo) - util::min(msb, lsb);
         auto constexpr max_idx = util::max(hi, lo) - util::min(msb, lsb);
         auto constexpr start_addr = min_idx * base_size;
         auto constexpr end_addr = (max_idx + 1) * base_size;
         // use the underlying logic implementation
-        VT::template update<end_addr - 1, start_addr>(v);
+        VT::template update_<end_addr - 1, start_addr>(v);
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator[](const logic<op_msb, op_lsb, op_signed> &op) const {
+        // if the value is too big, we return X
+        static const auto size_logic = logic<31, 0>(array_size);
+        if (op.xz_mask.any_set() || op >= size_logic) [[unlikely]] {
+            using T_ = typename util::get_array_base_type<T, base_size, T::is_4state>::type;
+            return T_{};
+        } else {
+            int index;
+            if constexpr (util::native_num(logic<op_msb, op_lsb>::size)) {
+                index = op.value.value;
+            } else {
+                index = op.value.value[0];
+            }
+            auto idx = index - util::min(msb, lsb);
+            auto start_addr = idx * base_size;
+            auto end_addr = (idx + 1) * base_size;
+            return VT::template slice<base_size>(start_addr, end_addr);
+        }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed, typename K>
+    void update(const logic<op_msb, op_lsb, op_signed> &op, const K &value) {
+        static const auto size_logic = logic<31, 0>(array_size);
+        if (op.xz_mask.any_set() || op >= size_logic) [[unlikely]] {
+            return;
+        } else {
+            int index;
+            if constexpr (util::native_num(logic<op_msb, op_lsb>::size)) {
+                index = op.value.value;
+            } else {
+                index = op.value.value[0];
+            }
+            auto idx = index - util::min(msb, lsb);
+            int start_addr = idx * base_size;
+            int end_addr = (idx + 1) * base_size;
+            VT::template update_(start_addr, end_addr, value);
+        }
     }
 
     template <typename IT>

@@ -51,7 +51,7 @@ public:
     /*
      * single bit
      */
-    inline logic<0> operator[](uint64_t idx) const {
+    inline logic<0> operator[](uint64_t idx) const requires(!array) {
         if (idx < size) [[likely]] {
             logic<0> r;
             if (x_set(idx)) [[unlikely]] {
@@ -70,7 +70,7 @@ public:
     }
 
     template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] inline logic get() const requires(!array) {
+    requires(idx < size) [[nodiscard]] inline logic<0> get() const requires(!array) {
         logic<0> r;
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
@@ -80,6 +80,22 @@ public:
             r.value = value.template get<idx>();
         }
         return r;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed, bool op_array>
+    logic<0> inline get(const logic<op_msb, op_lsb, op_signed, op_array> &op) const
+        requires(!array) {
+        uint64_t index;
+        if constexpr (logic<op_msb, op_lsb>::native_num) {
+            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+        } else {
+            if (op.fit_in_64() && !op.xz_mask.any_set()) {
+                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+            } else {
+                return x_();
+            }
+        }
+        return get(index);
     }
 
     void set(uint64_t idx, bool v) requires(!array) {
@@ -147,16 +163,15 @@ public:
     template <int a, int b>
     requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice() const
         requires(!array) {
-        if constexpr (size <= util::max(a, b)) {
-            // out of bound access will be X
-            return logic<util::abs_diff(a, b)>{};
-        }
+        return this->template slice_<a, b>();
+    }
 
-        logic<util::abs_diff(a, b), 0, false> result;
-        result.value = value.template slice<a, b>();
-        // copy over masks
-        result.xz_mask = xz_mask.template slice<a, b>();
-
+    // used for runtime slice (only used in packed array per SV LRM)
+    template <uint32_t target_size>
+    logic<target_size - 1, 0> slice(int a, int b) const {
+        logic<target_size - 1, 0> result;
+        result.value = value.template slice<target_size>(a, b);
+        result.xz_mask = xz_mask.template slice<target_size>(a, b);
         return result;
     }
 
@@ -703,23 +718,9 @@ public:
      */
     // setting values
     template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
-    void update(const logic<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size &&
-                                                                   util::match_endian(hi, lo, msb,
-                                                                                      lsb)) {
-        auto constexpr start = util::min(hi, lo);
-        auto constexpr end = util::max(hi, lo) + 1;
-        for (auto i = start; i < end; i++) {
-            // notice that if it is out of range, 0 will be returned
-            // we need to revert the index accessing scheme here, if the endian doesn't match
-            uint64_t idx;
-            if constexpr (logic<op_hi, op_lo, op_signed>::big_endian ^ big_endian) {
-                idx = util::max(op_lo, op_hi) - i;
-            } else {
-                idx = i;
-            }
-            auto b = op.operator[](idx);
-            set_(i, b);
-        }
+    requires(!array) void update(const logic<op_hi, op_lo, op_signed> &op) requires(
+        hi < size && lo < size && util::match_endian(hi, lo, msb, lsb)) {
+        this->template update_<hi, lo>(op);
     }
 
     /*
@@ -823,6 +824,60 @@ private:
     void set_(uint64_t idx, const logic<0, 0, l_signed> &l) {
         value.set(idx, l.value.value);
         xz_mask.set(idx, l.xz_mask.value);
+    }
+
+protected:
+    template <int a, int b>
+    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice_() const {
+        if constexpr (size <= util::max(a, b)) {
+            // out of bound access will be X
+            return logic<util::abs_diff(a, b)>{};
+        }
+
+        logic<util::abs_diff(a, b), 0, false> result;
+        result.value = value.template slice<a, b>();
+        // copy over masks
+        result.xz_mask = xz_mask.template slice<a, b>();
+
+        return result;
+    }
+
+    template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
+    void update_(const logic<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size &&
+                                                                    util::match_endian(hi, lo, msb,
+                                                                                       lsb)) {
+        auto constexpr start = util::min(hi, lo);
+        auto constexpr end = util::max(hi, lo) + 1;
+        for (auto i = start; i < end; i++) {
+            // notice that if it is out of range, 0 will be returned
+            // we need to revert the index accessing scheme here, if the endian doesn't match
+            uint64_t idx;
+            if constexpr (logic<op_hi, op_lo, op_signed>::big_endian ^ big_endian) {
+                idx = util::max(op_lo, op_hi) - i;
+            } else {
+                idx = i;
+            }
+            auto b = op.operator[](idx - start);
+            set_(i, b);
+        }
+    }
+
+    template <int op_hi, int op_lo, bool op_signed>
+    void update_(int hi, int lo, const logic<op_hi, op_lo, op_signed> &op) {
+        auto start = util::min(hi, lo);
+        auto end = util::max(hi, lo) + 1;
+        for (auto i = start; i < end; i++) {
+            // notice that if it is out of range, 0 will be returned
+            // we need to revert the index accessing scheme here, if the endian doesn't match
+            uint64_t idx;
+            if constexpr (logic<op_hi, op_lo, op_signed>::big_endian ^ big_endian) {
+                idx = util::max(op_lo, op_hi) - i;
+            } else {
+                idx = i;
+            }
+            auto b = op.operator[](idx - start);
+            set_(i, b);
+        }
     }
 };
 

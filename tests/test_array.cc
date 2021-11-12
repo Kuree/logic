@@ -26,7 +26,7 @@ TEST(array, slice) {  // NOLINT
         std::stringstream ss;
         for (auto i = 0; i < 16 * 10; i++) ss << '1';
         logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array{ss.str()};
-        auto s = logic_array.slice<4, 0>();
+        auto s = logic_array.slice_array<4, 0>();
         EXPECT_EQ(s.size, 16 * 5);
         EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 5));
     }
@@ -36,7 +36,7 @@ TEST(array, slice) {  // NOLINT
         std::stringstream ss;
         for (auto i = 0; i < 16 * 10; i++) ss << '1';
         logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array{ss.str()};
-        auto s = logic_array.slice<2, 0>();
+        auto s = logic_array.slice_array<2, 0>();
         EXPECT_EQ(s.size, 16 * 3);
         EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 3));
     }
@@ -52,6 +52,41 @@ TEST(array, update) {  // NOLINT
         for (auto i = 0; i < 16 * 2; i++) ss << '0';
         EXPECT_EQ(ss.str(), logic_array.str());
     }
+}
+
+TEST(array, index) {  // NOLINT
+    using namespace logic::literals;
+    {
+        logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array;
+        auto idx = 2_logic;
+        auto a = logic_array[idx];
+        EXPECT_EQ(a.size, 16);
+        // should all be x
+        std::stringstream ss;
+        for (auto i = 0; i < 16; i++) ss << 'x';
+        EXPECT_EQ(a.str(), ss.str());
+        // now set some values
+        logic_array.update(idx, 42_logic);
+        a = logic_array[idx];
+        EXPECT_EQ(a.str(), "0000000000101010");
+    }
+
+    {
+        logic::packed_array<logic::bit<15, 0>, 9, 0> bit_array;
+        auto idx = 2_logic;
+        auto a = bit_array[idx];
+        EXPECT_EQ(a.size, 16);
+        // should all be x
+        std::stringstream ss;
+        for (auto i = 0; i < 16; i++) ss << '0';
+        EXPECT_EQ(a.str(), ss.str());
+        // now set some values
+        bit_array.update(idx, 42_bit);
+        a = bit_array[idx];
+        EXPECT_EQ(a.str(), "0000000000101010");
+    }
+
+
 }
 
 TEST(unpacked_array, slice) {  // NOLINT
