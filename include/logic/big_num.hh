@@ -2,6 +2,7 @@
 #define LOGIC_BIG_NUM_HH
 
 #include "util.hh"
+#include <bit>
 
 namespace logic {
 template <uint64_t size, bool signed_>
