@@ -1,8 +1,9 @@
 #ifndef LOGIC_BIG_NUM_HH
 #define LOGIC_BIG_NUM_HH
 
-#include "util.hh"
 #include <bit>
+
+#include "util.hh"
 
 namespace logic {
 template <uint64_t size, bool signed_>
@@ -875,6 +876,11 @@ public:
         // this is undefined behavior
         return s;
     }
+
+    /*
+     * value conversions
+     */
+    [[nodiscard]] uint64_t to_uint64() const { return values[0]; }
 
     // constructors
     constexpr explicit big_num(std::string_view v) : big_num(v.rbegin(), v.rend()) {}

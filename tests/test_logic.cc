@@ -1062,3 +1062,10 @@ TEST(logic, update) {   // NOLINT
         EXPECT_EQ(a.str(), ss.str());
     }
 }
+
+TEST(logic, to_uint64) {    // NOLINT
+    using namespace logic::literals;
+    auto a = 42_logic;
+    auto v = a.to_uint64();
+    EXPECT_EQ(v, 42);
+}

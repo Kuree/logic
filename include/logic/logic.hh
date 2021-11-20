@@ -731,6 +731,16 @@ public:
     }
 
     /*
+     * value conversions
+     */
+    [[nodiscard]] uint64_t to_uint64() const {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_uint64();
+    }
+
+    /*
      * constructors
      */
     // by default everything is x

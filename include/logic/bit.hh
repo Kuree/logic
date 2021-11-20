@@ -766,6 +766,17 @@ public:
     }
 
     /*
+     * value conversions
+     */
+    [[nodiscard]] uint64_t to_uint64() const {
+        if constexpr (native_num) {
+            return value;
+        } else {
+            return value.to_uint64();
+        }
+    }
+
+    /*
      * constructors
      */
     explicit constexpr bit(std::string_view v) {
