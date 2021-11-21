@@ -152,7 +152,7 @@ public:
     }
 
     template <uint32_t size>
-    auto slice(int a, int b) const {
+    [[nodiscard]] auto slice(int a, int b) const {
         return this->template slice_<size>(a, b);
     }
 
@@ -899,7 +899,7 @@ protected:
     }
 
     template <uint32_t target_size>
-    auto slice_(int a, int b) const {
+    [[nodiscard]] auto slice_(int a, int b) const {
         bit<target_size - 1, false> result;
         if constexpr (native_num) {
             // assume the import has type-checked properly, e.g. by a compiler
