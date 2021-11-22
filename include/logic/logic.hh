@@ -751,7 +751,16 @@ public:
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit constexpr logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
-        parse_bits(v.rbegin(), v.rend());
+        auto base = 'b';
+        auto del_pos = v.find_first_of('\'');
+        if (del_pos != std::string::npos) {
+            // notice that not so much error checking here
+            auto base_pos = del_pos + 1;
+            if (base_pos != std::string::npos) {
+                base = v[base_pos];
+            }
+        }
+        parse_bits(v.rbegin(), v.rend(), base);
     }
 
     // conversion from bit to logic
@@ -781,20 +790,39 @@ private:
 
     // set bits
     template <typename T>
-    void parse_bits(T begin, T end) {
+    void parse_bits(T begin, T end, char base = 'b') {
         auto iter = begin;
-        for (auto i = 0u; i < size; i++) {
+        uint64_t i = 0, range = 0;
+        switch (base) {
+            case 'b':
+                range = 1;
+                break;
+
+            case 'o':
+                range = 3;
+                break;
+
+            case 'h':
+                range = 4;
+                break;
+
+            default:;
+        }
+        while (iter != end && (*iter) != '\'') {
             // from right to left
             auto c = *iter;
             switch (c) {
+                case 'X':
                 case 'x':
-                    set_x(i);
+                    for (auto j = 0u; j < range; j++) set_x(i * range + j);
                     break;
+                case 'Z':
                 case 'z':
-                    set_z(i);
+                    for (auto j = 0u; j < range; j++) set_z(i * range + j);
                     break;
                 default:;
             }
+            if (c != '_') i++;
             iter++;
             if (iter == end) break;
         }
