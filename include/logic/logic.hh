@@ -24,27 +24,81 @@ public:
                   "Native number holder");
 
     // basic formatting
-    [[nodiscard]] std::string str() const {
+    [[nodiscard]] std::string str(std::string_view fmt = "b") const {
+        auto str_len = util::str_len(size, fmt);
+        auto base = fmt.back();
+        bool skip_padding = fmt[0] == '0';
         std::stringstream ss;
-        for (auto i = 0u; i < size; i++) {
-            uint64_t idx;
-            if constexpr (big_endian) {
-                idx = size - i - 1;
+        int slice_size = 1;
+        bool upper_case = false;
+        if (base == 'd' || base == 'D') {
+            // need to deal with special case as well
+            if (xz_mask.any_set()) {
             } else {
-                idx = i;
-            }
-            if (x_set(idx)) {
-                ss << 'x';
-            } else if (z_set(idx)) {
-                ss << 'z';
-            } else {
-                if (value[idx]) {
-                    ss << '1';
+                bool add_sign = false;
+                auto v = *this;
+                auto hb = 0u;
+                if (signed_ && value.negative()) {
+                    v = value.negate();
+                    add_sign = true;
+                    hb = v.highest_bit();
                 } else {
+                    hb = value.highest_bit();
+                }
+                if (hb == size) {
+                    // it's zero
                     ss << '0';
+                } else {
+                    while (true) {
+                        auto q = v / 10u;
+                        auto r = v % 10u;
+                        ss << r.value.to_uint64();
+                        if (q == 0) break;
+                    }
+                    if (add_sign) ss << '-';
+                    // need to reverse the thing
+                    auto str = ss.str();
+                    std::reverse(str.begin(), str.end());
+                    ss = {};
+                    ss << str;
                 }
             }
+        } else {
+            switch (base) {
+                case 'b':
+                case 'B':
+                    slice_size = 1;
+                    break;
+                case 'o':
+                case 'O':
+                    slice_size = 3;
+                    break;
+                case 'h':
+                case 'H':
+                    slice_size = 4;
+                    break;
+                default:;
+            }
+            if (base == 'H' || base == 'B' || base == 'O') {
+                ss << std::uppercase;
+            }
+            // use hex since we're dealing with number that's smaller than 16
+            ss << std::hex;
+
+            auto top_bit =
+                static_cast<int>(util::min(size - 1, util::max(xz_mask.highest_bit(), value.highest_bit())));
+            auto i = 0;
+            auto constexpr lsb_base = util::min(msb, lsb);
+            while (i <= top_bit) {
+                auto base_idx = i * slice_size + lsb_base;
+                auto s = slice<4>(base_idx + slice_size - 1, base_idx);
+                auto i_v = s.to_uint64();
+                ss << i_v;
+
+                i += slice_size;
+            }
         }
+
         return ss.str();
     }
 

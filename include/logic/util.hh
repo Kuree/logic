@@ -48,6 +48,17 @@ constexpr T abs_diff(T a, T b) {
 
 constexpr bool native_num(uint64_t size) { return size <= big_num_threshold; }
 
+inline uint64_t str_len(uint64_t size, std::string_view fmt) {
+    auto pos = fmt.find_first_not_of("0123456789");
+    if (pos == 0) {
+        return size;
+    } else {
+        auto num = fmt.substr(0, pos);
+        auto v = std::stoul(std::string(num));
+        return max(size, v);
+    }
+}
+
 // LRM 11.8.1
 // For any non-self-determined expression, the result is signed if both operands are signed.
 constexpr bool signed_result(bool signed_op1, bool signed_op2) { return signed_op1 && signed_op2; }

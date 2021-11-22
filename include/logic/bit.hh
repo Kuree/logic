@@ -743,6 +743,37 @@ public:
         }
     }
 
+    [[nodiscard]] uint64_t highest_bit() const {
+        if constexpr (native_num) {
+            if (value == 0)
+                return size;
+            else {
+                auto r = __builtin_clzll(static_cast<uint64_t>(value));
+                return 64 - r - 1;
+            }
+        } else {
+            return value.highest_bit();
+        }
+    }
+
+    void negate() {
+        if constexpr (native_num) {
+            value = (~value) + 1;
+            mask_off();
+        } else {
+            return value.negate();
+        }
+    }
+
+    [[nodiscard]] bool all_set() const {
+        if constexpr (native_num) {
+            auto constexpr max = value_mask(size);
+            return value == max;
+        } else {
+            return value.all_set();
+        }
+    }
+
     /*
      * update using slice
      */

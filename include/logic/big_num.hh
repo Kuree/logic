@@ -784,6 +784,18 @@ public:
 
     [[maybe_unused]] void unmask() { std::fill(values.begin(), values.end(), 0); }
 
+    [[nodiscard]] bool all_set() const {
+        auto v = std::reduce(values.begin(), values.begin() + s - 1, 0,
+                             [](auto a, auto b) { return a & b; });
+        auto constexpr max =
+            std::numeric_limits<big_num_holder_type>::max() >> (s * big_num_threshold - size);
+        if constexpr (s == 1) {
+            return values[0] == max;
+        } else {
+            return v == (std::numeric_limits<uint64_t>::max()) && (values[s - 1] == max);
+        }
+    }
+
     /*
      * helper functions
      */
