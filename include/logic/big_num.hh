@@ -886,8 +886,8 @@ public:
     constexpr explicit big_num(std::string_view v) : big_num(v.rbegin(), v.rend()) {}
 
     template <typename T>
-    constexpr big_num(T begin, T end) {
-        parse_bits(begin, end);
+    constexpr big_num(T begin, T end, char base = 'b') {
+        parse_bits(begin, end, base);
     }
 
     template <typename T>
@@ -904,7 +904,7 @@ public:
     }
 
     // set values to 0 when initialized
-    constexpr big_num() { std::fill(values.begin(), values.end(), 0); }
+    constexpr big_num() { std::fill(values.begin(), values.end(), 0ull); }
 
     // implicit conversion between signed and unsigned
     template <uint64_t op_size, bool op_signed>
@@ -916,18 +916,83 @@ private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
 
     template <typename T>
-    void parse_bits(T begin, T end) {
+    void parse_bits(T begin, T end, char base) {
         std::fill(values.begin(), values.end(), 0);
         auto iter = begin;
-        for (auto i = 0u; i < size; i++) {
-            // from right to left
-            auto &value = values[i / big_num_threshold];
-            auto c = *iter;
-            if (c == '1') {
-                value |= 1ull << (i % big_num_threshold);
+        uint64_t i = 0;
+        switch (base) {
+            case 'b': {
+                while (iter != end && (*iter) != '\'') {
+                    // from right to left
+                    auto &value = values[i / big_num_threshold];
+                    auto c = *iter;
+                    if (c == '1') {
+                        value |= 1ull << (i % big_num_threshold);
+                        i++;
+                    }
+                    iter++;
+                }
+                break;
             }
-            iter++;
-            if (iter == end) break;
+            case 'o': {
+                while (iter != end && (*iter) != '\'') {
+                    auto c = *iter;
+                    if (c >= '0' && c <= '7') {
+                        auto v = c - '0';
+                        for (auto idx = 0; idx < 3; idx++) {
+                            if (v & (1 << idx)) {
+                                set(idx + i * 3, true);
+                                i++;
+                            }
+                        }
+                    }
+                    iter++;
+                }
+                break;
+            }
+            case 'd': {
+                // this is not very efficient, but it works. since literals are computed at
+                // compile time, this should be fine?
+                big_num<size, false> base_, ten, result;
+                base_.values[0] = 1ull;
+                ten.values[0] = 10ull;
+                while (iter != end && (*iter) != '\'') {
+                    auto c = *iter;
+                    if (c >= '0' && c <= '9') {
+                        uint64_t v = c - '0';
+                        auto temp = big_num<size, false>();
+                        temp.values[0] = v;
+                        result = result + temp * base_;
+                        base_ = base_ * ten;
+                    }
+                    iter++;
+                }
+                (*this) = result;
+                break;
+            }
+            case 'h': {
+                while (iter != end && (*iter) != '\'') {
+                    auto c = *iter;
+                    char v = 0;
+                    if (c >= '0' && c <= '9') {
+                        v = c - '0';
+                    } else if (c >= 'a' && c <= 'f') {
+                        v = c - 'a' + 10;
+                    } else if (c >= 'A' && c <= 'F') {
+                        v = c - 'A' + 10;
+                    }
+                    for (auto idx = 0; idx < 4; idx++) {
+                        if (v & (1 << idx)) {
+                            set(idx + i * 4, true);
+                            i++;
+                        }
+                    }
+                    iter++;
+                }
+                break;
+            }
+            default: {
+            }
         }
     }
 };

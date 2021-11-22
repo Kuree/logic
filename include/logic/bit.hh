@@ -780,12 +780,21 @@ public:
      * constructors
      */
     explicit constexpr bit(std::string_view v) {
+        auto base = 'b';
+        auto del_pos = v.find_first_of('\'');
+        if (del_pos != std::string::npos) {
+            // notice that not so much error checking here
+            auto base_pos = del_pos + 1;
+            if (base_pos != std::string::npos) {
+                base = v[base_pos];
+            }
+        }
         if constexpr (size <= big_num_threshold) {
             // normal number
-            parse_bits(v.rbegin(), v.rend());
+            parse_bits(v.rbegin(), v.rend(), base);
         } else {
             // big num
-            value = big_num<size, signed_>(v);
+            value = big_num<size, signed_>(v.rbegin(), v.rend(), base);
         }
     }
 
@@ -815,17 +824,51 @@ public:
 
 private:
     template <typename T>
-    void parse_bits(T begin, T end) {
+    void parse_bits(T begin, T end, char base) {
         value = 0;
         auto iter = begin;
-        for (auto i = 0u; i < size; i++) {
+        uint64_t i = 0;
+        while (iter != end && (*iter) != '\'') {
             // from right to left
             auto c = *iter;
-            if (c == '1') {
-                value |= 1ull << i;
+            switch (base) {
+                case 'b': {
+                    if (c == '1') {
+                        value |= 1ull << (i++);
+                    }
+                    break;
+                }
+                case 'h': {
+                    if (c >= '0' && c <= '9') {
+                        value |= static_cast<uint64_t>((c - '0')) << ((i++) * 4);
+                    } else if (c >= 'a' && c <= 'f') {
+                        value |= static_cast<uint64_t>((c - 'a') + 10) << ((i++) * 4);
+                    } else if (c >= 'A' && c <= 'F') {
+                        value |= static_cast<uint64_t>((c - 'A') + 10) << ((i++) * 4);
+                    }
+                    break;
+                }
+                case 'o': {
+                    if (c >= '0' && c <= '7') {
+                        value |= static_cast<uint64_t>((c - '0')) << ((i++) * 3);
+                    }
+                    break;
+                }
+                case 'd': {
+                    if (i == 0) i = 1;
+                    if (c >= '0' && c <= '9') {
+                        value += static_cast<uint64_t>((c - '0')) * i;
+                        i *= 10;
+                    }
+                    break;
+                }
+
+                default: {
+                    // ignore random characters such as _
+                }
             }
+
             iter++;
-            if (iter == end) break;
         }
     }
     /*

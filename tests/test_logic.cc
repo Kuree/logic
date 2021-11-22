@@ -999,7 +999,7 @@ TEST(logic, gt) {  // NOLINT
     }
 }
 
-TEST(logic, update) {   // NOLINT
+TEST(logic, update) {  // NOLINT
     {
         // native number exact
         logic::logic<15, 0> a;
@@ -1037,7 +1037,6 @@ TEST(logic, update) {   // NOLINT
         EXPECT_EQ(a.str(), ss.str());
     }
 
-
     {
         // little endian
         logic::logic<0, 99> a;
@@ -1063,9 +1062,23 @@ TEST(logic, update) {   // NOLINT
     }
 }
 
-TEST(logic, to_uint64) {    // NOLINT
+TEST(logic, to_uint64) {  // NOLINT
     using namespace logic::literals;
     auto a = 42_logic;
     auto v = a.to_uint64();
     EXPECT_EQ(v, 42);
+}
+
+TEST(logic, string_init) {  // NOLINT
+    auto a = logic::logic<31, 0>("16'hFFFF");
+    EXPECT_EQ(a.to_uint64(), 0xFFFF);
+
+    auto b = logic::logic<127, 0>("128'd123456");
+    EXPECT_EQ(b.to_uint64(), 123456);
+
+    auto c = logic::logic<9, 0>("32'h42");
+    EXPECT_EQ(c.to_uint64(), 66);
+
+    auto d = logic::logic<31, 0>("100'o12");
+    EXPECT_EQ(d.to_uint64(), 0xA);
 }
