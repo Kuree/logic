@@ -1081,4 +1081,7 @@ TEST(logic, string_init) {  // NOLINT
 
     auto d = logic::logic<31, 0>("100'o12");
     EXPECT_EQ(d.to_uint64(), 0xA);
+
+    auto e = logic::logic<31, 0>("20'b001_0101");
+    EXPECT_EQ(e.to_uint64(), 21);
 }

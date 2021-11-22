@@ -834,24 +834,27 @@ private:
             switch (base) {
                 case 'b': {
                     if (c == '1') {
-                        value |= 1ull << (i++);
+                        value |= 1ull << i;
                     }
+                    if (c != '_') i++;
                     break;
                 }
                 case 'h': {
                     if (c >= '0' && c <= '9') {
-                        value |= static_cast<uint64_t>((c - '0')) << ((i++) * 4);
+                        value |= static_cast<uint64_t>((c - '0')) << (i * 4);
                     } else if (c >= 'a' && c <= 'f') {
-                        value |= static_cast<uint64_t>((c - 'a') + 10) << ((i++) * 4);
+                        value |= static_cast<uint64_t>((c - 'a') + 10) << (i * 4);
                     } else if (c >= 'A' && c <= 'F') {
-                        value |= static_cast<uint64_t>((c - 'A') + 10) << ((i++) * 4);
+                        value |= static_cast<uint64_t>((c - 'A') + 10) << (i * 4);
                     }
+                    if (c != '_') i++;
                     break;
                 }
                 case 'o': {
                     if (c >= '0' && c <= '7') {
-                        value |= static_cast<uint64_t>((c - '0')) << ((i++) * 3);
+                        value |= static_cast<uint64_t>((c - '0')) << (i * 3);
                     }
+                    if (c != '_') i++;
                     break;
                 }
                 case 'd': {

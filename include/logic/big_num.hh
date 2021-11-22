@@ -926,10 +926,8 @@ private:
                     // from right to left
                     auto &value = values[i / big_num_threshold];
                     auto c = *iter;
-                    if (c == '1') {
-                        value |= 1ull << (i % big_num_threshold);
-                        i++;
-                    }
+                    if (c == '1') value |= 1ull << (i % big_num_threshold);
+                    if (c != '_') i++;
                     iter++;
                 }
                 break;
@@ -980,6 +978,8 @@ private:
                         v = c - 'a' + 10;
                     } else if (c >= 'A' && c <= 'F') {
                         v = c - 'A' + 10;
+                    } else if (c == '_') {
+                        continue;
                     }
                     for (auto idx = 0; idx < 4; idx++) {
                         if (v & (1 << idx)) {
