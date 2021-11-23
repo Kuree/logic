@@ -1,0 +1,7 @@
+add_library(logic util.cc)
+target_include_directories(logic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+if(MSVC)
+    target_compile_options(logic PRIVATE /W4 /WX)
+else()
+    target_compile_options(logic PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()

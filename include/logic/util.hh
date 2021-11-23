@@ -136,6 +136,21 @@ template <uint64_t s, bool signed_>
 struct get_holder_type<s, signed_, typename std::enable_if<gte(s, 65)>::type> {
     using type = big_num<s, signed_>;
 };
+
+// string related stuff
+// for parsing native numbers
+// if four state detected, will set the value flag properly
+uint64_t parse_raw_str(std::string_view value);
+uint64_t parse_xz_raw_str(std::string_view value);
+void parse_raw_str(std::string_view value, uint64_t size, uint64_t *ptr);
+void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t *ptr);
+
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value);
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask);
+std::string to_string(std::string fmt, uint64_t size, uint64_t array_size, uint64_t *value);
+std::string to_string(std::string fmt, uint64_t size, uint64_t array_size, uint64_t *value,
+                      uint64_t *xz_mask);
+
 }  // namespace util
 }  // namespace logic
 
