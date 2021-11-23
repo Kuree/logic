@@ -1,5 +1,8 @@
 #include "logic/util.hh"
 
+#include <cmath>
+#include <optional>
+
 namespace logic::util {
 
 constexpr std::pair<char, uint64_t> get_base(std::string_view value) {
@@ -149,6 +152,8 @@ uint64_t get_stride(char base) {
             return 3;
         case 'h':
         case 'H':
+        case 'x':
+        case 'X':
             return 4;
         default:
             return 1;
@@ -193,6 +198,376 @@ void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
         end = begin;
         remaining_size -= batch_size;
     }
+}
+
+constexpr std::array<uint64_t, 128> compute_decimal_size() {
+    // we precompute 128 entries of decimal sizes. if larger than that we need to
+    // recompute each time. no caching allowed for the sakes of concurrency since
+    // we need to protect the cache with a mutex if that is the case
+    std::array<uint64_t, 128> result{};
+    // zero is ill-defined
+    result[0] = 1;
+
+    for (auto i = 1u; i < 128; i++) {
+        __uint128_t value = 0;
+        value = ~value;
+        // shift based on the size
+        auto q = value >> (128 - i);
+        auto r = 0u;
+        while (q != 0) {
+            q = q / 10;
+            r++;
+        }
+        result[i] = q;
+    }
+
+    return result;
+}
+
+static constexpr auto decimal_size_table = compute_decimal_size();
+
+void parse_fmt(const std::string_view& fmt, uint64_t size, char& base, uint64_t& actual_size,
+               bool& padding) {
+    base = 'X';
+    padding = true;  // per LRM 21.2.1.3, we need to perform padding by default
+    // need to find the base
+    auto pos = fmt.find_first_not_of("0123456789");
+    if (pos != std::string::npos) {
+        base = fmt[pos];
+    }
+    // now that we now the base, need to see what's requested size
+    std::optional<uint64_t> requested_size;
+    if (pos != 0) {
+        // don't copy here?
+        requested_size = std::stoul(std::string(fmt.substr(0, pos)));
+    }
+
+    // compute actual size
+    uint64_t possible_size;
+    switch (base) {
+        case 'b':
+        case 'B': {
+            possible_size = size;
+            break;
+        }
+        case 'o':
+        case 'O': {
+            possible_size = static_cast<uint64_t>(ceil(static_cast<double>(size) / 3.0));
+            break;
+        }
+        case 'd':
+        case 'D': {
+            // give up if the size is larger than 128
+            // will implement this in the future
+            if (size > 128) {
+                possible_size = size;
+            } else {
+                possible_size = decimal_size_table[size];
+            }
+            break;
+        }
+        case 'x':
+        case 'X':
+        case 'h':
+        case 'H': {
+            possible_size = static_cast<uint64_t>(ceil(static_cast<double>(size) / 4.0));
+            break;
+        }
+        default:
+            possible_size = size;
+    }
+
+    actual_size = possible_size;
+    if (requested_size) {
+        // need to compute the actual size and do a max, unless it's 0, which we don't do any
+        // padding
+        if (*requested_size == 0) {
+            padding = false;
+        } else {
+            actual_size = std::max(actual_size, *requested_size);
+        }
+    }
+}
+
+std::string pad_result(bool is_negative, char base, uint64_t actual_size, bool padding,
+                       const std::stringstream& ss) {
+    auto result = ss.str();
+    if (is_negative && (base == 'd' || base == 'D')) {
+        result = "-" + result;
+    }
+    if (padding) {
+        if (result.size() < actual_size) {
+            auto pad_char = (base == 'd' || base == 'D') ? " " : "0";
+            for (auto i = 0u; i < (actual_size - result.size()); i++) {
+                result = pad_char + result;  // NOLINT
+            }
+        }
+    }
+    return result;
+}
+
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool is_negative) {
+    char base;
+    uint64_t actual_size;
+    bool padding;
+    parse_fmt(fmt, size, base, actual_size, padding);
+
+    // now print out the format
+    std::stringstream ss;
+    switch (base) {
+        case 'b':
+        case 'B': {
+            ss << std::ios_base::binary;
+            break;
+        }
+        case 'o':
+        case 'O': {
+            ss << std::ios_base::oct;
+            break;
+        }
+        case 'x':
+        case 'h': {
+            ss << std::ios_base::hex;
+            break;
+        }
+        case 'X':
+        case 'H': {
+            ss << std::ios_base::hex << std::ios_base::uppercase;
+            break;
+        }
+        default:;
+    }
+    ss << value;
+    return pad_result(is_negative, base, actual_size, padding, ss);
+}
+
+uint64_t get_mask(uint64_t stride) { return std::numeric_limits<uint64_t>::max() >> (64 - stride); }
+
+std::string fmt_value(char base, uint64_t size, uint64_t value, uint64_t xz_mask) {
+    auto stride = get_stride(base);
+    const auto mask = get_mask(stride);
+    std::stringstream ss;
+    for (auto i = 0u; i < size; i += stride) {
+        auto v = (value >> i) & mask;
+        auto xz = (xz_mask >> i) & mask;
+        if (xz != 0) {
+            // need to see if it's all x or all z
+            if (xz == mask) {
+                if (v == 0) {
+                    ss << 'x';
+                } else if (v == mask) {
+                    ss << 'z';
+                } else {
+                    ss << 'X';
+                }
+            } else {
+                // need to check each one
+                // we have a mix. need to see if it contains x
+                bool has_x = false;
+                for (auto j = 0u; j < stride; j++) {
+                    auto bit = (v >> j) & 1;
+                    auto bit_xz = (xz >> j) & 1;
+                    if (bit_xz && !bit) {
+                        ss << 'X';
+                        has_x = true;
+                        break;
+                    }
+                }
+                if (!has_x) {
+                    ss << 'Z';
+                }
+            }
+        }
+    }
+    return ss.str();
+}
+
+std::string fmt_decimal(uint64_t size, uint64_t value, uint64_t xz_mask) {
+    if (xz_mask != 0) {
+        // need to test if all the bits are x/z
+        auto mask = std::numeric_limits<uint64_t>::max() >> (64 - size);
+        if (xz_mask == mask) {
+            // all x or zero
+            if (value == 0) {
+                return "x";
+            } else if (value == mask) {
+                return "z";
+            } else {
+                return "X";
+            }
+        } else {
+            // some of them are actual digits
+            // need to check if it contains x or not
+            for (auto i = 0u; i < size; i++) {
+                auto v = (value >> i) & 1;
+                auto xz = (xz_mask >> i) & 1;
+                if (xz && !v) {
+                    return "X";
+                }
+            }
+            return "Z";
+        }
+    } else {
+        return std::to_string(value);
+    }
+}
+
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
+                      bool is_negative) {
+    char base;
+    uint64_t actual_size;
+    bool padding;
+    parse_fmt(fmt, size, base, actual_size, padding);
+
+    std::stringstream ss;
+
+    // need to obey the rule of LRM 21.2.1.4
+    switch (base) {
+        case 'b':
+        case 'B': {
+            for (auto i = 0u; i < size; i++) {
+                auto c = (value >> i) & 1;
+                auto xz = (xz_mask >> i) & 1;
+                if (xz == 0) {
+                    ss << c;
+                } else {
+                    ss << (c ? 'z' : 'x');
+                }
+            }
+            break;
+        }
+        case 'o':
+        case 'O':
+        case 'h':
+        case 'H':
+        case 'x':
+        case 'X': {
+            ss << fmt_value(base, size, value, xz_mask);
+            break;
+        }
+            // decimal is special
+        case 'd':
+        case 'D': {
+            ss << fmt_decimal(size, value, xz_mask);
+        }
+        default:
+            break;
+    }
+
+    return pad_result(is_negative, base, actual_size, padding, ss);
+}
+
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, bool is_negative) {
+    char base;
+    uint64_t actual_size;
+    bool padding;
+    parse_fmt(fmt, size, base, actual_size, padding);
+
+    auto num_array = (size % 64 == 0) ? size / 64 : (size / 64 + 1);
+
+    std::stringstream ss;
+    if (base != 'd' && base != 'D') {
+        for (auto i = 0u; i < num_array - 1; i++) {
+            ss << to_string(fmt, 64, value[i], false);
+        }
+        if (size % 64) {
+            ss << to_string(fmt, size % 64, value[num_array - 1], false);
+        }
+    } else {
+        // FIXME
+        // give up. display the least significant two parts
+        auto size_ = size > 128 ? 128 : size;
+        __uint128_t v = 0;
+        if (size_ > 64) {
+            v |= value[1];
+            v = v << 64;
+        }
+        v |= value[0];
+        auto q = v;
+        while (q != 0) {
+            auto r = q % 10;
+            ss << static_cast<uint64_t>(r);
+            q = q / 10;
+        }
+    }
+
+    return pad_result(is_negative, base, actual_size, padding, ss);
+}
+
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, uint64_t* xz_mask,
+                      bool is_negative) {
+    char base;
+    uint64_t actual_size;
+    bool padding;
+    parse_fmt(fmt, size, base, actual_size, padding);
+
+    auto num_array = (size % 64 == 0) ? size / 64 : (size / 64 + 1);
+
+    std::stringstream ss;
+    if (base != 'd' && base != 'D') {
+        for (auto i = 0u; i < num_array - 1; i++) {
+            ss << to_string(fmt, 64, value[i], xz_mask[i], false);
+        }
+        if (size % 64) {
+            ss << to_string(fmt, size % 64, value[num_array - 1], xz_mask[num_array - 1], false);
+        }
+    } else {
+        // FIXME
+        // give up. display the least significant two parts
+        auto size_ = size > 128 ? 128 : size;
+        __uint128_t v = 0;
+        __uint128_t xz = 0;
+        if (size_ > 64) {
+            v |= value[1];
+            v = v << 64;
+            xz |= xz_mask[1];
+            xz = xz << 64;
+        }
+        v |= value[0];
+        xz |= xz_mask[0];
+        if (xz != 0) {
+            // contains x/z
+            if ((~xz) == 0) {
+                // all x or z
+                if (v == 0) {
+                    ss << 'x';
+                } else {
+                    if ((~v) == 0) {
+                        // all z
+                        ss << 'z';
+                    } else {
+                        ss << 'X';
+                    }
+                }
+            } else {
+                // has some real digits
+                bool has_x = false;
+                for (auto i = 0u; i < size_; i++) {
+                    auto x = (xz >> i) & 1;
+                    if (x) {
+                        auto vv = (v >> i) & 1;
+                        if (vv == 0) {
+                            has_x = true;
+                            break;
+                        }
+                    }
+                }
+                if (has_x)
+                    ss << "X";
+                else
+                    ss << "Z";
+            }
+        } else {
+            auto q = v;
+            while (q != 0) {
+                auto r = q % 10;
+                ss << static_cast<uint64_t>(r);
+                q = q / 10;
+            }
+        }
+    }
+
+    return pad_result(is_negative, base, actual_size, padding, ss);
 }
 
 }  // namespace logic::util

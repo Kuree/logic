@@ -145,11 +145,12 @@ uint64_t parse_xz_raw_str(std::string_view value);
 void parse_raw_str(std::string_view value, uint64_t size, uint64_t *ptr);
 void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t *ptr);
 
-std::string to_string(std::string_view fmt, uint64_t size, uint64_t value);
-std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask);
-std::string to_string(std::string fmt, uint64_t size, uint64_t array_size, uint64_t *value);
-std::string to_string(std::string fmt, uint64_t size, uint64_t array_size, uint64_t *value,
-                      uint64_t *xz_mask);
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool is_negative);
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
+                      bool is_negative);
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t *value, bool is_negative);
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t *value, uint64_t *xz_mask,
+                      bool is_negative);
 
 }  // namespace util
 }  // namespace logic
