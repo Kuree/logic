@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_subdirectory(src)
 
 # tests
-if (EXISTS extern/googletest/CMakeLists.txt)
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/extern/googletest/CMakeLists.txt)
     add_subdirectory(extern/googletest)
     include(GoogleTest)
     include (CTest)
