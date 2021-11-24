@@ -202,12 +202,12 @@ TEST(logic, and_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<140 - 1, 0> b{s};
         auto c = a & b;
         ss = {};
-        for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (140 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b & a;
         EXPECT_EQ(ss.str(), c.str());
@@ -219,12 +219,12 @@ TEST(logic, and_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<40 - 1, 0> b{s};
         auto c = a & b;
         ss = {};
-        for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (120 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b & a;
         EXPECT_EQ(ss.str(), c.str());
@@ -269,12 +269,12 @@ TEST(logic, or_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '0';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<140 - 1, 0> b{s};
         auto c = a | b;
         ss = {};
-        for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (140 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b | a;
         EXPECT_EQ(ss.str(), c.str());
@@ -286,12 +286,12 @@ TEST(logic, or_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '0';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<40 - 1, 0> b{s};
         auto c = a | b;
         ss = {};
-        for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (120 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b | a;
         EXPECT_EQ(ss.str(), c.str());
@@ -336,12 +336,12 @@ TEST(logic, xor_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '0';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<140 - 1, 0> b{s};
         auto c = a ^ b;
         ss = {};
-        for (auto i = 0u; i < (140 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (140 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b ^ a;
         EXPECT_EQ(ss.str(), c.str());
@@ -353,12 +353,12 @@ TEST(logic, xor_) {  // NOLINT
         ss << "'b";
         for (auto i = 0; i < 120; i++) ss << '0';
         logic::logic<120 - 1, 0> a{ss.str()};
-        auto const s = "1010101010"sv;
+        auto const s = "'b1010101010"sv;
         logic::logic<40 - 1, 0> b{s};
         auto c = a ^ b;
         ss = {};
-        for (auto i = 0u; i < (120 - s.size()); i++) ss << '0';
-        ss << s;
+        for (auto i = 0u; i < (120 - s.size() + 2); i++) ss << '0';
+        ss << "1010101010";
         EXPECT_EQ(ss.str(), c.str());
         c = b ^ a;
         EXPECT_EQ(ss.str(), c.str());
@@ -530,13 +530,13 @@ TEST(logic, bitwise_shift_left) {  // NOLINT
         ss << "'b";
         for (uint64_t i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        logic::logic<100 - 1, 0> b{"1111111111111111"};
+        logic::logic<100 - 1, 0> b{"'b1111111111111111"};
 
         auto c = a << b;
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100 - 1, 0>{"111"};
+        b = logic::logic<100 - 1, 0>{"'b111"};
         c = a << b;
         ss = {};
         for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
@@ -569,13 +569,13 @@ TEST(logic, bitwise_shift_right) {  // NOLINT
         ss << "'b";
         for (uint64_t i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        logic::logic<100 - 1, 0> b{"1111111111111111"};
+        logic::logic<100 - 1, 0> b{"'b1111111111111111"};
 
         auto c = a >> b;
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100 - 1, 0>{"111"};
+        b = logic::logic<100 - 1, 0>{"'b111"};
         c = a >> b;
         ss = {};
         for (auto i = 0; i < 7; i++) ss << '0';
@@ -608,13 +608,13 @@ TEST(logic, arithmetic_shift_left) {  // NOLINT
         ss << "'b";
         for (uint64_t i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        logic::logic<100 - 1, 0> b{"1111111111111111"};
+        logic::logic<100 - 1, 0> b{"'b1111111111111111"};
 
         auto c = a.ashl(b);
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100 - 1, 0>{"111"};
+        b = logic::logic<100 - 1, 0>{"'b111"};
         c = a.ashl(b);
         ss = {};
         for (uint64_t i = 0; i < (120 - 7); i++) ss << '1';
@@ -647,13 +647,13 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
         ss << "'b";
         for (uint64_t i = 0; i < 120; i++) ss << '1';
         logic::logic<120 - 1, 0> a{ss.str()};
-        logic::logic<100 - 1, 0> b{"1111111111111111"};
+        logic::logic<100 - 1, 0> b{"'b1111111111111111"};
 
         auto c = a.ashr(b);
         ss = {};
         for (uint64_t i = 0; i < 120; i++) ss << '0';
         EXPECT_EQ(ss.str(), c.str());
-        b = logic::logic<100 - 1, 0>{"111"};
+        b = logic::logic<100 - 1, 0>{"'b111"};
         c = a >> b;
         ss = {};
         for (auto i = 0; i < 7; i++) ss << '0';
@@ -673,7 +673,7 @@ TEST(logic, arithmetic_shift_right) {  // NOLINT
     {
         // big number signed shifting
         std::stringstream ss;
-        ss << '1';
+        ss << "'b1";
         for (auto i = 0; i < (420 - 1); i++) ss << '0';
         logic::logic<420 - 1, 0, true> a{ss.str()};
         logic::logic<120 - 1, 0> b{42ul};
@@ -702,7 +702,7 @@ TEST(logic, equal) {  // NOLINT
 
     {
         // with x and z
-        logic::logic<1024 - 1, 0> a{"x"};
+        logic::logic<1024 - 1, 0> a{"'bx"};
         logic::logic<20 - 1, 0> b{12};
         auto c = a == b;
         EXPECT_EQ(c.str(), "x");

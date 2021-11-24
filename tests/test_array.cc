@@ -24,21 +24,23 @@ TEST(array, slice) {  // NOLINT
     {
         // big number returns big number
         std::stringstream ss;
+        ss << "'b";
         for (auto i = 0; i < 16 * 10; i++) ss << '1';
         logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array{ss.str()};
         auto s = logic_array.slice_array<4, 0>();
         EXPECT_EQ(s.size, 16 * 5);
-        EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 5));
+        EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 5 + 2));
     }
 
     {
         // big number returns small number
         std::stringstream ss;
+        ss << "'b";
         for (auto i = 0; i < 16 * 10; i++) ss << '1';
         logic::packed_array<logic::logic<15, 0>, 9, 0> logic_array{ss.str()};
         auto s = logic_array.slice_array<2, 0>();
         EXPECT_EQ(s.size, 16 * 3);
-        EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 3));
+        EXPECT_EQ(s.str(), ss.str().substr(16 * 10 - 16 * 3 + 2));
     }
 }
 

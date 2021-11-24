@@ -29,7 +29,7 @@ struct union_a: logic::union_<16> {
 
 TEST(union_, ctor) {    // NOLINT
     union_a::type u;
-    auto l = logic::logic<15, 0>{"1111111111111111"};
+    auto l = logic::logic<15, 0>{"'b1111111111111111"};
     union_a::a(u, l);
     auto b = union_a::b(u);
     EXPECT_EQ(b.str(), "11111111");

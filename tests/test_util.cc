@@ -5,11 +5,6 @@
 
 TEST(util, int_parsing) {  // NOLINT
     {
-        // TODO: remove this once the parsing migrates to the SV syntax
-        auto v = logic::util::parse_raw_str("01010");
-        EXPECT_EQ(v, 0b1010);
-    }
-    {
         auto v = logic::util::parse_raw_str("4'b1010");
         EXPECT_EQ(v, 0b1010);
         v = logic::util::parse_raw_str("4'b10x0");
