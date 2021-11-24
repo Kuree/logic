@@ -78,3 +78,13 @@ TEST(util, ints_parsing) {  // NOLINT
         EXPECT_EQ(data[2], 0x0F0F0F0F);
     }
 }
+
+TEST(util, parse_raw_string) {  // NOLINT
+    //auto v = logic::util::parse_raw_str("ABCD");
+    //EXPECT_EQ(v, 0x41424344);
+
+    std::array<uint64_t, 2> data = {};
+    logic::util::parse_raw_str("ABCDEFGHIJKLMNOP", 128, data.data());
+    EXPECT_EQ(data[0], 0x494a4b4c4d4e4f50);
+    EXPECT_EQ(data[1], 0x4142434445464748);
+}

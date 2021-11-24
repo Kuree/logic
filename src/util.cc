@@ -19,6 +19,8 @@ constexpr std::pair<char, uint64_t> get_base(std::string_view value) {
             base = value[b];
             pos = b + 1 + p + 1;
         }
+    } else {
+        base = 's';
     }
 
     return {base, pos};
@@ -93,6 +95,13 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
                 if (c != '_') idx++;
             }
             break;
+        }
+        case 's':
+        case 'S': {
+            for (auto i = 0u; i < value.size(); i++) {
+                uint64_t c = static_cast<uint8_t>(value[value.size() - i - 1]);
+                result |= c << (i * 8);
+            }
         }
         default:;
     }
@@ -175,6 +184,9 @@ uint64_t get_stride(char base) {
         case 'x':
         case 'X':
             return 4;
+        case 's':
+        case 'S':
+            return 8;
         default:
             return 1;
     }
@@ -252,7 +264,8 @@ static constexpr auto decimal_size_table = compute_decimal_size();
 
 void parse_fmt(const std::string_view& fmt, uint64_t size, char& base, uint64_t& actual_size,
                bool& padding) {
-    base = 'X';
+    // if base not specified, we treat it as a raw string
+    base = 's';
     padding = true;  // per LRM 21.2.1.3, we need to perform padding by default
     // need to find the base
     auto pos = fmt.find_first_not_of("0123456789");
@@ -322,7 +335,7 @@ std::string pad_result(bool is_negative, char base, uint64_t actual_size, bool p
     if (padding) {
         if (result.size() < actual_size) {
             auto const num_pad = actual_size - result.size();
-            auto pad_char = (base == 'd' || base == 'D') ? " " : "0";
+            auto pad_char = (base == 'd' || base == 'D' || base == 's' || base == 'S') ? " " : "0";
             for (auto i = 0u; i < num_pad; i++) {
                 result.append(pad_char);
             }
@@ -365,6 +378,12 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool 
             ss << std::ios_base::hex << std::ios_base::uppercase << value;
             break;
         }
+        case 's':
+        case 'S':
+            for (auto i = 0u; i < size; i += 8) {
+                auto c = value >> (i * 8) & 0xFF;
+                ss << c;
+            }
         default:;
     }
     return pad_result(is_negative, base, actual_size, padding, ss);
@@ -441,6 +460,15 @@ std::string fmt_decimal(uint64_t size, uint64_t value, uint64_t xz_mask) {
     }
 }
 
+std::string fmt_char(uint64_t size, uint64_t value) {
+    std::stringstream ss;
+    for (auto i = 0u; i < size; i++) {
+        auto c = value >> (8 * i) & 0xFF;
+        ss << c;
+    }
+    return ss.str();
+}
+
 std::string to_string_(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
                        bool is_negative, bool use_padding) {
     char base;
@@ -474,10 +502,16 @@ std::string to_string_(std::string_view fmt, uint64_t size, uint64_t value, uint
             ss << fmt_value(base, size, value, xz_mask);
             break;
         }
-            // decimal is special
+        // decimal is special
         case 'd':
         case 'D': {
             ss << fmt_decimal(size, value, xz_mask);
+            break;
+        }
+        case 's':
+        case 'S': {
+            // the LRM does not specify the behavior if there is an x or z
+            ss << fmt_char(size, value);
         }
         default:
             break;
