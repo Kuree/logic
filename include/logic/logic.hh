@@ -25,81 +25,14 @@ public:
 
     // basic formatting
     [[nodiscard]] std::string str(std::string_view fmt = "b") const {
-        auto str_len = util::str_len(size, fmt);
-        auto base = fmt.back();
-        bool skip_padding = fmt[0] == '0';
-        std::stringstream ss;
-        int slice_size = 1;
-        bool upper_case = false;
-        if (base == 'd' || base == 'D') {
-            // need to deal with special case as well
-            if (xz_mask.any_set()) {
-            } else {
-                bool add_sign = false;
-                auto v = *this;
-                auto hb = 0u;
-                if (signed_ && value.negative()) {
-                    v = value.negate();
-                    add_sign = true;
-                    hb = v.highest_bit();
-                } else {
-                    hb = value.highest_bit();
-                }
-                if (hb == size) {
-                    // it's zero
-                    ss << '0';
-                } else {
-                    while (true) {
-                        auto q = v / 10u;
-                        auto r = v % 10u;
-                        ss << r.value.to_uint64();
-                        if (q == 0) break;
-                    }
-                    if (add_sign) ss << '-';
-                    // need to reverse the thing
-                    auto str = ss.str();
-                    std::reverse(str.begin(), str.end());
-                    ss = {};
-                    ss << str;
-                }
-            }
+        if constexpr (util::native_num(size)) {
+            uint64_t v = value.value;
+            uint64_t xz = xz_mask.value;
+            return util::to_string(fmt, size, v, xz, false);
         } else {
-            switch (base) {
-                case 'b':
-                case 'B':
-                    slice_size = 1;
-                    break;
-                case 'o':
-                case 'O':
-                    slice_size = 3;
-                    break;
-                case 'h':
-                case 'H':
-                    slice_size = 4;
-                    break;
-                default:;
-            }
-            if (base == 'H' || base == 'B' || base == 'O') {
-                ss << std::uppercase;
-            }
-            // use hex since we're dealing with number that's smaller than 16
-            ss << std::hex;
-
-            auto top_bit =
-                static_cast<int>(util::min(size - 1, util::max(xz_mask.highest_bit(), value.highest_bit())));
-            auto i = 0;
-            auto constexpr lsb_base = util::min(msb, lsb);
-            while (i <= top_bit) {
-                auto base_idx = i * slice_size + lsb_base;
-                auto s = slice<4>(base_idx + slice_size - 1, base_idx);
-                auto i_v = s.to_uint64();
-                ss << i_v;
-
-                i += slice_size;
-            }
+            return util::to_string(fmt, size, value.value.values.data(),
+                                   xz_mask.value.values.data(), false);
         }
-
-        return ss.str();
     }
 
     /*
@@ -805,16 +738,13 @@ public:
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit constexpr logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
-        auto base = 'b';
-        auto del_pos = v.find_first_of('\'');
-        if (del_pos != std::string::npos) {
-            // notice that not so much error checking here
-            auto base_pos = del_pos + 1;
-            if (base_pos != std::string::npos) {
-                base = v[base_pos];
-            }
+        if constexpr (util::native_num(size)) {
+            value.value = util::parse_raw_str(v);
+            xz_mask.value = util::parse_xz_raw_str(v);
+        } else {
+            util::parse_raw_str(v, size, value.value.values.data());
+            util::parse_xz_raw_str(v, size, xz_mask.value.values.data());
         }
-        parse_bits(v.rbegin(), v.rend(), base);
     }
 
     // conversion from bit to logic
@@ -840,46 +770,6 @@ private:
     template <uint64_t idx>
     void unmask_bit() {
         xz_mask.template set<idx, false>();
-    }
-
-    // set bits
-    template <typename T>
-    void parse_bits(T begin, T end, char base = 'b') {
-        auto iter = begin;
-        uint64_t i = 0, range = 0;
-        switch (base) {
-            case 'b':
-                range = 1;
-                break;
-
-            case 'o':
-                range = 3;
-                break;
-
-            case 'h':
-                range = 4;
-                break;
-
-            default:;
-        }
-        while (iter != end && (*iter) != '\'') {
-            // from right to left
-            auto c = *iter;
-            switch (c) {
-                case 'X':
-                case 'x':
-                    for (auto j = 0u; j < range; j++) set_x(i * range + j);
-                    break;
-                case 'Z':
-                case 'z':
-                    for (auto j = 0u; j < range; j++) set_z(i * range + j);
-                    break;
-                default:;
-            }
-            if (c != '_') i++;
-            iter++;
-            if (iter == end) break;
-        }
     }
 
     /*

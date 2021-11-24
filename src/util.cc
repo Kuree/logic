@@ -1,5 +1,6 @@
 #include "logic/util.hh"
 
+#include <bitset>
 #include <cmath>
 #include <optional>
 
@@ -28,46 +29,58 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
     switch (base) {
         case 'd':
         case 'D': {
-            // since x in decimal is not allowed. we use system default parsing functions
-            result = std::stoull(value.data());
+            uint64_t base10 = 1;
+            for (auto i = 0ull; i < value.size(); i++) {
+                auto c = value[value.size() - i - 1];
+                if (c >= '0' && c <= '9') {
+                    uint64_t v = c - '0';
+                    result += v * base10;
+                    base10 *= 10;
+                }
+            }
             break;
         }
         case 'b':
         case 'B': {
             // need to take care of 1 and z
+            uint64_t idx = 0;
             for (auto i = 0ull; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
                 if (c == '1' || c == 'z') {
-                    result |= 1ull << i;
+                    result |= 1ull << idx;
                 }
+                if (c != '_') idx++;
             }
             break;
         }
         case 'o':
         case 'O': {
             // same for x
+            uint64_t idx = 0;
             for (auto i = 0ull; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
                 uint64_t s;
                 // this will be taken care of by the xz mask parsing
-                if (c == 'x' || c == 'X')
-                    continue;
+                if (c == 'x' || c == 'X' || c == '_')
+                    s = 0;
                 else if (c == 'z' || c == 'Z')
                     s = 0b111;
                 else
                     s = c - '0';
-                result |= s << (i * 3ull);
+                result |= s << (idx * 3ull);
+                if (c != '_') idx++;
             }
             break;
         }
         case 'h':
         case 'H': {
+            uint64_t idx = 0;
             for (auto i = 0ull; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
                 uint64_t s = 0;
                 // this will be taken care of by the xz mask parsing
-                if (c == 'x' || c == 'X')
-                    continue;
+                if (c == 'x' || c == 'X' || c == '_')
+                    s = 0;
                 else if (c == 'z' || c == 'Z')
                     s = 0b1111;
                 else if (c >= '0' && c <= '9')
@@ -76,7 +89,8 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
                     s = c - 'a';
                 else if (c >= 'A' && c <= 'F')
                     s = c - 'A' + 10;
-                result |= s << (i * 4ull);
+                result |= s << (idx * 4ull);
+                if (c != '_') idx++;
             }
             break;
         }
@@ -97,38 +111,44 @@ uint64_t parse_xz_raw_str_(std::string_view value, char base) {
     switch (base) {
         case 'b':
         case 'B': {
+            uint64_t idx = 0;
             for (auto i = 0u; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
                 if (c == 'x' || c == 'z') {
-                    result |= 1u << i;
+                    result |= 1u << idx;
                 }
+                if (c != '_') idx++;
             }
             break;
         }
         case 'o':
         case 'O': {
             // same for x
+            uint64_t idx = 0;
             for (auto i = 0u; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
                 uint64_t s;
                 // this will be taken care of by the xz mask parsing
                 if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') {
                     s = 0b111;
-                    result |= s << (i * 3);
+                    result |= s << (idx * 3);
                 }
+                if (c != '_') idx++;
             }
             break;
         }
         case 'h':
         case 'H': {
+            uint64_t idx = 0;
             for (auto i = 0u; i < value.size(); i++) {
                 auto c = value[value.size() - i - 1];
-                uint64_t s = 0;
+                uint64_t s;
                 // this will be taken care of by the xz mask parsing
                 if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') {
                     s = 0b1111;
-                    result |= s << (i * 4);
+                    result |= s << (idx * 4);
                 }
+                if (c != '_') idx++;
             }
         }
         default:;
@@ -169,14 +189,16 @@ void parse_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     auto end = value.size();
     auto const stride = get_stride(base);
     auto const batch_size = 64 / stride;
+
+    auto num_array = (size % 64 == 0) ? size / 64 : (size / 64 + 1);
     uint64_t idx = 0;
-    while (remaining_size > 0 && idx < size) {
+    while (remaining_size > 0 && idx < num_array) {
         auto begin = remaining_size >= batch_size ? remaining_size - batch_size : 0;
         ptr[idx] = parse_raw_str_(value.substr(begin, end), base);
 
         idx++;
         end = begin;
-        remaining_size -= batch_size;
+        remaining_size = remaining_size > batch_size ? remaining_size - batch_size : 0;
     }
 }
 
@@ -189,14 +211,16 @@ void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     auto end = value.size();
     auto const stride = get_stride(base);
     auto const batch_size = 64 / stride;
+
+    auto num_array = (size % 64 == 0) ? size / 64 : (size / 64 + 1);
     uint64_t idx = 0;
-    while (remaining_size > 0 && idx < size) {
+    while (remaining_size > 0 && idx < num_array) {
         auto begin = remaining_size >= batch_size ? remaining_size - batch_size : 0;
         ptr[idx] = parse_xz_raw_str_(value.substr(begin, end), base);
 
         idx++;
         end = begin;
-        remaining_size -= batch_size;
+        remaining_size = remaining_size > batch_size ? remaining_size - batch_size : 0;
     }
 }
 
@@ -293,16 +317,18 @@ std::string pad_result(bool is_negative, char base, uint64_t actual_size, bool p
                        const std::stringstream& ss) {
     auto result = ss.str();
     if (is_negative && (base == 'd' || base == 'D')) {
-        result = "-" + result;
+        result.append("-");
     }
     if (padding) {
         if (result.size() < actual_size) {
+            auto const num_pad = actual_size - result.size();
             auto pad_char = (base == 'd' || base == 'D') ? " " : "0";
-            for (auto i = 0u; i < (actual_size - result.size()); i++) {
-                result = pad_char + result;  // NOLINT
+            for (auto i = 0u; i < num_pad; i++) {
+                result.append(pad_char);
             }
         }
     }
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
@@ -317,27 +343,30 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool 
     switch (base) {
         case 'b':
         case 'B': {
-            ss << std::ios_base::binary;
+            auto b = std::bitset<64>(value);
+            auto s = b.to_string().substr(64 - size);
+            // need to reverse it
+            std::reverse(s.begin(), s.end());
+            ss << s;
             break;
         }
         case 'o':
         case 'O': {
-            ss << std::ios_base::oct;
+            ss << std::ios_base::oct << value;
             break;
         }
         case 'x':
         case 'h': {
-            ss << std::ios_base::hex;
+            ss << std::ios_base::hex << value;
             break;
         }
         case 'X':
         case 'H': {
-            ss << std::ios_base::hex << std::ios_base::uppercase;
+            ss << std::ios_base::hex << std::ios_base::uppercase << value;
             break;
         }
         default:;
     }
-    ss << value;
     return pad_result(is_negative, base, actual_size, padding, ss);
 }
 
@@ -412,8 +441,8 @@ std::string fmt_decimal(uint64_t size, uint64_t value, uint64_t xz_mask) {
     }
 }
 
-std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
-                      bool is_negative) {
+std::string to_string_(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
+                       bool is_negative, bool use_padding) {
     char base;
     uint64_t actual_size;
     bool padding;
@@ -454,10 +483,19 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint6
             break;
     }
 
-    return pad_result(is_negative, base, actual_size, padding, ss);
+    if (use_padding)
+        return pad_result(is_negative, base, actual_size, padding, ss);
+    else
+        return ss.str();
 }
 
-std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, bool is_negative) {
+std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint64_t xz_mask,
+                      bool is_negative) {
+    return to_string_(fmt, size, value, xz_mask, is_negative, true);
+}
+
+std::string to_string_(std::string_view fmt, uint64_t size, const uint64_t* value, bool is_negative,
+                       bool use_padding) {
     char base;
     uint64_t actual_size;
     bool padding;
@@ -491,11 +529,19 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, bool
         }
     }
 
-    return pad_result(is_negative, base, actual_size, padding, ss);
+    if (use_padding)
+        return pad_result(is_negative, base, actual_size, padding, ss);
+    else
+        return ss.str();
 }
 
-std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, uint64_t* xz_mask,
+std::string to_string(std::string_view fmt, uint64_t size, const uint64_t* value,
                       bool is_negative) {
+    return to_string_(fmt, size, value, is_negative, true);
+}
+
+std::string to_string(std::string_view fmt, uint64_t size, const uint64_t* value,
+                      const uint64_t* xz_mask, bool is_negative) {
     char base;
     uint64_t actual_size;
     bool padding;
@@ -506,10 +552,11 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t* value, uint
     std::stringstream ss;
     if (base != 'd' && base != 'D') {
         for (auto i = 0u; i < num_array - 1; i++) {
-            ss << to_string(fmt, 64, value[i], xz_mask[i], false);
+            ss << to_string_(fmt, 64, value[i], xz_mask[i], false, false);
         }
         if (size % 64) {
-            ss << to_string(fmt, size % 64, value[num_array - 1], xz_mask[num_array - 1], false);
+            ss << to_string_(fmt, size % 64, value[num_array - 1], xz_mask[num_array - 1], false,
+                             false);
         }
     } else {
         // FIXME

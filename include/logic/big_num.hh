@@ -895,12 +895,7 @@ public:
     [[nodiscard]] uint64_t to_uint64() const { return values[0]; }
 
     // constructors
-    constexpr explicit big_num(std::string_view v) : big_num(v.rbegin(), v.rend()) {}
-
-    template <typename T>
-    constexpr big_num(T begin, T end, char base = 'b') {
-        parse_bits(begin, end, base);
-    }
+    constexpr explicit big_num(std::string_view v) { util::parse_raw_str(v, size, values.data()); }
 
     template <typename T>
     requires std::is_arithmetic_v<T>
@@ -926,87 +921,6 @@ public:
 
 private:
     [[nodiscard]] bool get(uint64_t idx) const { return operator[](idx); }
-
-    template <typename T>
-    void parse_bits(T begin, T end, char base) {
-        std::fill(values.begin(), values.end(), 0);
-        auto iter = begin;
-        uint64_t i = 0;
-        switch (base) {
-            case 'b': {
-                while (iter != end && (*iter) != '\'') {
-                    // from right to left
-                    auto &value = values[i / big_num_threshold];
-                    auto c = *iter;
-                    if (c == '1') value |= 1ull << (i % big_num_threshold);
-                    if (c != '_') i++;
-                    iter++;
-                }
-                break;
-            }
-            case 'o': {
-                while (iter != end && (*iter) != '\'') {
-                    auto c = *iter;
-                    if (c >= '0' && c <= '7') {
-                        auto v = c - '0';
-                        for (auto idx = 0; idx < 3; idx++) {
-                            if (v & (1 << idx)) {
-                                set(idx + i * 3, true);
-                                i++;
-                            }
-                        }
-                    }
-                    iter++;
-                }
-                break;
-            }
-            case 'd': {
-                // this is not very efficient, but it works. since literals are computed at
-                // compile time, this should be fine?
-                big_num<size, false> base_, ten, result;
-                base_.values[0] = 1ull;
-                ten.values[0] = 10ull;
-                while (iter != end && (*iter) != '\'') {
-                    auto c = *iter;
-                    if (c >= '0' && c <= '9') {
-                        uint64_t v = c - '0';
-                        auto temp = big_num<size, false>();
-                        temp.values[0] = v;
-                        result = result + temp * base_;
-                        base_ = base_ * ten;
-                    }
-                    iter++;
-                }
-                (*this) = result;
-                break;
-            }
-            case 'h': {
-                while (iter != end && (*iter) != '\'') {
-                    auto c = *iter;
-                    char v = 0;
-                    if (c >= '0' && c <= '9') {
-                        v = c - '0';
-                    } else if (c >= 'a' && c <= 'f') {
-                        v = c - 'a' + 10;
-                    } else if (c >= 'A' && c <= 'F') {
-                        v = c - 'A' + 10;
-                    } else if (c == '_') {
-                        continue;
-                    }
-                    for (auto idx = 0; idx < 4; idx++) {
-                        if (v & (1 << idx)) {
-                            set(idx + i * 4, true);
-                            i++;
-                        }
-                    }
-                    iter++;
-                }
-                break;
-            }
-            default: {
-            }
-        }
-    }
 };
 }  // namespace logic
 

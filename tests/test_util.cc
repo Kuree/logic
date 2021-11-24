@@ -50,11 +50,12 @@ TEST(util, int_parsing) {  // NOLINT
 TEST(util, ints_parsing) {  // NOLINT
     {
         std::stringstream ss;
+        ss << "'b";
         for (auto i = 0; i < 50; i++) {
             ss << "10";
         }
         std::array<uint64_t, 2> data = {};
-        logic::util::parse_raw_str(ss.str(), 2, data.data());
+        logic::util::parse_raw_str(ss.str(), 2 * 64, data.data());
         EXPECT_EQ(data[0], 0xAAAAAAAAAAAAAAAA);
         EXPECT_EQ(data[1], 0xAAAAAAAAA);
     }
@@ -66,12 +67,12 @@ TEST(util, ints_parsing) {  // NOLINT
             ss << "1X";
         }
         std::array<uint64_t, 3> data = {};
-        logic::util::parse_raw_str(ss.str(), 3, data.data());
+        logic::util::parse_raw_str(ss.str(), 3 * 64, data.data());
         EXPECT_EQ(data[0], 0x1010101010101010);
         EXPECT_EQ(data[1], 0x1010101010101010);
         EXPECT_EQ(data[2], 0x10101010);
 
-        logic::util::parse_xz_raw_str(ss.str(), 3, data.data());
+        logic::util::parse_xz_raw_str(ss.str(), 3 * 64, data.data());
         EXPECT_EQ(data[0], 0x0F0F0F0F0F0F0F0F);
         EXPECT_EQ(data[1], 0x0F0F0F0F0F0F0F0F);
         EXPECT_EQ(data[2], 0x0F0F0F0F);

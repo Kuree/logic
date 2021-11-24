@@ -22,22 +22,21 @@ public:
     T value;
 
     // basic formatting
-    [[nodiscard]] std::string str() const {
-        std::stringstream ss;
-        for (auto i = 0; i < size; i++) {
-            uint64_t idx;
-            if constexpr (big_endian) {
-                idx = size - i - 1;
+    [[nodiscard]] std::string str(std::string_view fmt = "b") const {
+        if constexpr (native_num) {
+            if (signed_ && negative()) {
+                return util::to_string(fmt, size, negate().value, true);
             } else {
-                idx = i;
+                return util::to_string(fmt, size, value, false);
             }
-            if (get_(idx)) {
-                ss << '1';
+        } else {
+            if (signed_ && negative()) {
+                auto neg = negate();
+                return util::to_string(fmt, size, neg.value.values.data(), true);
             } else {
-                ss << '0';
+                return util::to_string(fmt, size, value.values.data(), false);
             }
         }
-        return ss.str();
     }
 
     // single bit
@@ -765,6 +764,17 @@ public:
         }
     }
 
+    [[nodiscard]] bit<size - 1, 0> negate() const {
+        bit<size - 1, 0> res;
+        if constexpr (native_num) {
+            res.value = (~value) + 1;
+            res.mask_off();
+        } else {
+            res.value = value.negate();
+        }
+        return res;
+    }
+
     [[nodiscard]] bool all_set() const {
         if constexpr (native_num) {
             auto constexpr max = value_mask(size);
@@ -811,21 +821,10 @@ public:
      * constructors
      */
     explicit constexpr bit(std::string_view v) {
-        auto base = 'b';
-        auto del_pos = v.find_first_of('\'');
-        if (del_pos != std::string::npos) {
-            // notice that not so much error checking here
-            auto base_pos = del_pos + 1;
-            if (base_pos != std::string::npos) {
-                base = v[base_pos];
-            }
-        }
-        if constexpr (size <= big_num_threshold) {
-            // normal number
-            parse_bits(v.rbegin(), v.rend(), base);
+        if constexpr (native_num) {
+            value = static_cast<T>(util::parse_raw_str(v));
         } else {
-            // big num
-            value = big_num<size, signed_>(v.rbegin(), v.rend(), base);
+            util::parse_raw_str(v, size, value.values.data());
         }
     }
 
@@ -854,57 +853,6 @@ public:
     }
 
 private:
-    template <typename T>
-    void parse_bits(T begin, T end, char base) {
-        value = 0;
-        auto iter = begin;
-        uint64_t i = 0;
-        while (iter != end && (*iter) != '\'') {
-            // from right to left
-            auto c = *iter;
-            switch (base) {
-                case 'b': {
-                    if (c == '1') {
-                        value |= 1ull << i;
-                    }
-                    if (c != '_') i++;
-                    break;
-                }
-                case 'h': {
-                    if (c >= '0' && c <= '9') {
-                        value |= static_cast<uint64_t>((c - '0')) << (i * 4);
-                    } else if (c >= 'a' && c <= 'f') {
-                        value |= static_cast<uint64_t>((c - 'a') + 10) << (i * 4);
-                    } else if (c >= 'A' && c <= 'F') {
-                        value |= static_cast<uint64_t>((c - 'A') + 10) << (i * 4);
-                    }
-                    if (c != '_') i++;
-                    break;
-                }
-                case 'o': {
-                    if (c >= '0' && c <= '7') {
-                        value |= static_cast<uint64_t>((c - '0')) << (i * 3);
-                    }
-                    if (c != '_') i++;
-                    break;
-                }
-                case 'd': {
-                    if (i == 0) i = 1;
-                    if (c >= '0' && c <= '9') {
-                        value += static_cast<uint64_t>((c - '0')) * i;
-                        i *= 10;
-                    }
-                    break;
-                }
-
-                default: {
-                    // ignore random characters such as _
-                }
-            }
-
-            iter++;
-        }
-    }
     /*
      * unpacking, which is basically slicing as syntax sugars
      */
