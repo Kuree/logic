@@ -25,6 +25,19 @@ public:
 
     // basic formatting
     [[nodiscard]] std::string str(std::string_view fmt = "b") const {
+        if constexpr (signed_) {
+            auto is_negative = value.negative();
+            if (is_negative && util::decimal_fmt(fmt)) {
+                auto value_ = value.negate().value;
+                if constexpr (util::native_num(size)) {
+                    uint64_t xz = xz_mask.value;
+                    return util::to_string(fmt, size, value_, xz, true);
+                } else {
+                    return util::to_string(fmt, size, value_.values.data(),
+                                           xz_mask.value.values.data(), true);
+                }
+            }
+        }
         if constexpr (util::native_num(size)) {
             uint64_t v = value.value;
             uint64_t xz = xz_mask.value;
@@ -737,7 +750,7 @@ public:
     explicit constexpr logic(T value) : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
-    explicit constexpr logic(std::string_view v) : value(bit<msb, lsb, signed_>(v)) {
+    explicit constexpr logic(std::string_view v) {
         if constexpr (util::native_num(size)) {
             value.value = util::parse_raw_str(v);
             xz_mask.value = util::parse_xz_raw_str(v);

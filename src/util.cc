@@ -6,7 +6,7 @@
 
 namespace logic::util {
 
-constexpr std::pair<char, uint64_t> get_base(std::string_view value) {
+constexpr std::pair<char, uint64_t> get_input_base(std::string_view value) {
     char base = 'b';
     uint64_t pos = 0;
 
@@ -24,6 +24,15 @@ constexpr std::pair<char, uint64_t> get_base(std::string_view value) {
     }
 
     return {base, pos};
+}
+
+char get_output_base(std::string_view fmt) {
+    auto p = fmt.find_first_not_of("0123456789");
+    if (p == std::string::npos) {
+        return 'b';
+    } else {
+        return fmt[p];
+    }
 }
 
 constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
@@ -98,7 +107,7 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
         }
         case 's':
         case 'S': {
-            for (auto i = 0u; i < value.size(); i++) {
+            for (auto i = 0u; i < std::min(8ul, value.size()); i++) {
                 uint64_t c = static_cast<uint8_t>(value[value.size() - i - 1]);
                 result |= c << (i * 8);
             }
@@ -110,7 +119,7 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
 }
 
 uint64_t parse_raw_str(std::string_view value) {
-    auto [base, start_pos] = get_base(value);
+    auto [base, start_pos] = get_input_base(value);
     return parse_raw_str_(value.substr(start_pos), base);
 }
 
@@ -167,7 +176,7 @@ uint64_t parse_xz_raw_str_(std::string_view value, char base) {
 }
 
 uint64_t parse_xz_raw_str(std::string_view value) {
-    auto [base, start_pos] = get_base(value);
+    auto [base, start_pos] = get_input_base(value);
     return parse_xz_raw_str_(value.substr(start_pos), base);
 }
 
@@ -195,7 +204,7 @@ uint64_t get_stride(char base) {
 void parse_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     // use existing functions to parse single uint64_t values, except for decimals.
     // big number decimals are just inefficient, and I don't know why would anyone use it.
-    auto [base, start_pos] = get_base(value);
+    auto [base, start_pos] = get_input_base(value);
     value = value.substr(start_pos);
     auto remaining_size = value.size();
     auto end = value.size();
@@ -206,7 +215,7 @@ void parse_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     uint64_t idx = 0;
     while (remaining_size > 0 && idx < num_array) {
         auto begin = remaining_size >= batch_size ? remaining_size - batch_size : 0;
-        ptr[idx] = parse_raw_str_(value.substr(begin, end), base);
+        ptr[idx] = parse_raw_str_(value.substr(begin, end - begin), base);
 
         idx++;
         end = begin;
@@ -217,7 +226,7 @@ void parse_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
 void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     // use existing functions to parse single uint64_t values, except for decimals.
     // big number decimals are just inefficient, and I don't know why would anyone use it.
-    auto [base, start_pos] = get_base(value);
+    auto [base, start_pos] = get_input_base(value);
     value = value.substr(start_pos);
     auto remaining_size = value.size();
     auto end = value.size();
@@ -228,7 +237,7 @@ void parse_xz_raw_str(std::string_view value, uint64_t size, uint64_t* ptr) {
     uint64_t idx = 0;
     while (remaining_size > 0 && idx < num_array) {
         auto begin = remaining_size >= batch_size ? remaining_size - batch_size : 0;
-        ptr[idx] = parse_xz_raw_str_(value.substr(begin, end), base);
+        ptr[idx] = parse_xz_raw_str_(value.substr(begin, end - begin), base);
 
         idx++;
         end = begin;
@@ -254,7 +263,7 @@ constexpr std::array<uint64_t, 128> compute_decimal_size() {
             q = q / 10;
             r++;
         }
-        result[i] = q;
+        result[i] = r;
     }
 
     return result;
@@ -310,6 +319,11 @@ void parse_fmt(const std::string_view& fmt, uint64_t size, char& base, uint64_t&
             possible_size = static_cast<uint64_t>(ceil(static_cast<double>(size) / 4.0));
             break;
         }
+        case 's':
+        case 'S': {
+            possible_size = static_cast<uint64_t>(ceil(static_cast<double>(size) / 8.0));
+            break;
+        }
         default:
             possible_size = size;
     }
@@ -331,6 +345,7 @@ std::string pad_result(bool is_negative, char base, uint64_t actual_size, bool p
     auto result = ss.str();
     if (is_negative && (base == 'd' || base == 'D')) {
         result.append("-");
+        actual_size++;
     }
     if (padding) {
         if (result.size() < actual_size) {
@@ -343,6 +358,26 @@ std::string pad_result(bool is_negative, char base, uint64_t actual_size, bool p
     }
     std::reverse(result.begin(), result.end());
     return result;
+}
+
+std::string format_value_2power(char base, uint64_t value) {
+    std::ostringstream ss;
+    switch (base) {
+        case 'o':
+        case 'O': {
+            ss << std::oct << value;
+            break;
+        }
+        case 'x':
+        case 'h':
+        case 'X':
+        case 'H': {
+            ss << std::hex << value;
+            break;
+        }
+        default:;
+    }
+    return ss.str();
 }
 
 std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool is_negative) {
@@ -364,18 +399,12 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool 
             break;
         }
         case 'o':
-        case 'O': {
-            ss << std::ios_base::oct << value;
-            break;
-        }
+        case 'O':
         case 'x':
-        case 'h': {
-            ss << std::ios_base::hex << value;
-            break;
-        }
+        case 'h':
         case 'X':
         case 'H': {
-            ss << std::ios_base::hex << std::ios_base::uppercase << value;
+            ss << format_value_2power(base, value);
             break;
         }
         case 's':
@@ -425,6 +454,9 @@ std::string fmt_value(char base, uint64_t size, uint64_t value, uint64_t xz_mask
                     ss << 'Z';
                 }
             }
+        } else {
+            auto str = format_value_2power(base, v);
+            ss << str;
         }
     }
     return ss.str();
@@ -456,14 +488,21 @@ std::string fmt_decimal(uint64_t size, uint64_t value, uint64_t xz_mask) {
             return "Z";
         }
     } else {
-        return std::to_string(value);
+        std::stringstream ss;
+        while (value > 0) {
+            auto r = value % 10;
+            ss << r;
+            value /= 10;
+        }
+        return ss.str();
     }
 }
 
 std::string fmt_char(uint64_t size, uint64_t value) {
     std::stringstream ss;
-    for (auto i = 0u; i < size; i++) {
-        auto c = value >> (8 * i) & 0xFF;
+    auto num_chunk = static_cast<uint64_t>(std::ceil(static_cast<double>(size) / 8));
+    for (auto i = 0u; i < num_chunk; i++) {
+        auto c = static_cast<char>(static_cast<uint8_t>(value >> (8 * i) & 0xFF));
         ss << c;
     }
     return ss.str();
@@ -512,6 +551,7 @@ std::string to_string_(std::string_view fmt, uint64_t size, uint64_t value, uint
         case 'S': {
             // the LRM does not specify the behavior if there is an x or z
             ss << fmt_char(size, value);
+            break;
         }
         default:
             break;
@@ -539,11 +579,31 @@ std::string to_string_(std::string_view fmt, uint64_t size, const uint64_t* valu
 
     std::stringstream ss;
     if (base != 'd' && base != 'D') {
-        for (auto i = 0u; i < num_array - 1; i++) {
-            ss << to_string(fmt, 64, value[i], false);
-        }
-        if (size % 64) {
-            ss << to_string(fmt, size % 64, value[num_array - 1], false);
+        // notice that because in oct format, 3 is not a power of 2, we need to be extra careful
+        if (base == 'o' || base == 'O') {
+            auto num_chunks = static_cast<uint64_t>(std::ceil(static_cast<double>(size) / 3));
+            for (auto i = 0u; i < num_chunks; i++) {
+                auto start = i * 3;
+                auto value_idx = start / 64;
+                auto start_idx = start % 64;
+                // if it's across the 64-bit boundary
+                uint64_t v;
+                if ((64 - start_idx) < 3) {
+                    v = (value[value_idx] >> start_idx) & 0x7;
+                    v |= (value[value_idx + 1]) & (0x7 >> (64 - start_idx));
+                } else {
+                    v = (value[value_idx] >> start_idx) & 0x7;
+                }
+                auto s = to_string(fmt, 3, v, false);
+                ss << s;
+            }
+        } else {
+            for (auto i = 0u; i < num_array - 1; i++) {
+                ss << to_string(fmt, 64, value[i], false);
+            }
+            if (size % 64) {
+                ss << to_string(fmt, size % 64, value[num_array - 1], false);
+            }
         }
     } else {
         // FIXME
@@ -585,13 +645,38 @@ std::string to_string(std::string_view fmt, uint64_t size, const uint64_t* value
 
     std::stringstream ss;
     if (base != 'd' && base != 'D') {
-        for (auto i = 0u; i < num_array - 1; i++) {
-            ss << to_string_(fmt, 64, value[i], xz_mask[i], false, false);
+        // notice that because in oct format, 3 is not a power of 2, we need to be extra careful
+        if (base == 'o' || base == 'O') {
+            auto num_chunks = static_cast<uint64_t>(std::ceil(static_cast<double>(size) / 3));
+            for (auto i = 0u; i < num_chunks; i++) {
+                auto start = i * 3;
+                auto value_idx = start / 64;
+                auto start_idx = start % 64;
+                // if it's across the 64-bit boundary
+                uint64_t v;
+                uint64_t xz;
+                if ((64 - start_idx) < 3) {
+                    v = (value[value_idx] >> start_idx) & 0x7;
+                    v |= (value[value_idx + 1]) & (0x7 >> (64 - start_idx));
+                    xz = (xz_mask[value_idx] >> start_idx) & 0x7;
+                    xz |= (xz_mask[value_idx + 1]) & (0x7 >> (64 - start_idx));
+                } else {
+                    v = (value[value_idx] >> start_idx) & 0x7;
+                    xz = (xz_mask[value_idx] >> start_idx) & 0x7;
+                }
+                auto s = to_string_(fmt, 3, v, xz, false, false);
+                ss << s;
+            }
+        } else {
+            for (auto i = 0u; i < num_array - 1; i++) {
+                ss << to_string_(fmt, 64, value[i], xz_mask[i], false, false);
+            }
+            if (size % 64) {
+                ss << to_string_(fmt, size % 64, value[num_array - 1], xz_mask[num_array - 1],
+                                 false, false);
+            }
         }
-        if (size % 64) {
-            ss << to_string_(fmt, size % 64, value[num_array - 1], xz_mask[num_array - 1], false,
-                             false);
-        }
+
     } else {
         // FIXME
         // give up. display the least significant two parts
@@ -649,6 +734,11 @@ std::string to_string(std::string_view fmt, uint64_t size, const uint64_t* value
     }
 
     return pad_result(is_negative, base, actual_size, padding, ss);
+}
+
+bool decimal_fmt(std::string_view fmt) {
+    auto base = get_output_base(fmt);
+    return base == 'd' || base == 'D';
 }
 
 }  // namespace logic::util

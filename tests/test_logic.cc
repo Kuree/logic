@@ -1106,3 +1106,65 @@ TEST(logic, string_init) {  // NOLINT
     auto e = logic::logic<31, 0>("20'b001_0101");
     EXPECT_EQ(e.to_uint64(), 21);
 }
+
+TEST(logic, format) {  // NOLINT
+    {
+        auto a = logic::logic<20 - 1, 0>("'b1010_1001");
+        auto s = a.str("0d");
+        EXPECT_EQ(s, "169");
+    }
+    {
+        auto a = logic::logic<20 - 1, 0>("'b1010_1001");
+        auto s = a.str("d");
+        EXPECT_EQ(s, "    169");
+    }
+
+    {
+        // negative numbers
+        auto b = -logic::logic<20 - 1, 0, true>("'d42");
+        auto s = b.str("0d");
+        EXPECT_EQ(s, "-42");
+    }
+
+    {
+        // negative numbers
+        auto b = -logic::logic<20 - 1, 0, true>("'d42");
+        auto s = b.str("10d");
+        EXPECT_EQ(s, "        -42");
+    }
+
+    {
+        // negative numbers
+        auto b = -logic::logic<20 - 1, 0, true>("'d42");
+        auto s = b.str("d");
+        EXPECT_EQ(s, "     -42");
+    }
+
+    {
+        // hex
+        auto a = logic::logic<20 - 1, 0>("'d42");
+        auto s = a.str("x");
+        EXPECT_EQ(s, "0002a");
+    }
+
+    // big number oct
+    {
+        auto a = logic::logic<120 - 1, 0>("'hFFFFFFFFFFFF");
+        auto s = a.str("o");
+        EXPECT_EQ(s, "0000000000000000000000007777777777777777");
+    }
+
+    // big number hex
+    {
+        auto a = logic::logic<120 - 1, 0>("'hFFFFFFFFFFFF");
+        auto s = a.str("X");
+        EXPECT_EQ(s, "000000000000000000ffffffffffff");
+    }
+
+    {
+        // big number raw str with overflow
+        auto a = logic::logic<120 - 1, 0>("ABCDEFGHIJKLMNOPQRST");
+        auto s = a.str("s");
+        EXPECT_EQ(s, "FGHIJKLMNOPQRST");
+    }
+}

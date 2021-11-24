@@ -24,13 +24,13 @@ public:
     // basic formatting
     [[nodiscard]] std::string str(std::string_view fmt = "b") const {
         if constexpr (native_num) {
-            if (signed_ && negative()) {
+            if (signed_ && negative() && util::decimal_fmt(fmt)) {
                 return util::to_string(fmt, size, negate().value, true);
             } else {
                 return util::to_string(fmt, size, value, false);
             }
         } else {
-            if (signed_ && negative()) {
+            if (signed_ && negative() && util::decimal_fmt(fmt)) {
                 auto neg = negate();
                 return util::to_string(fmt, size, neg.value.values.data(), true);
             } else {

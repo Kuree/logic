@@ -151,6 +151,7 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, uint6
 std::string to_string(std::string_view fmt, uint64_t size, const uint64_t *value, bool is_negative);
 std::string to_string(std::string_view fmt, uint64_t size, const uint64_t *value,
                       const uint64_t *xz_mask, bool is_negative);
+bool decimal_fmt(std::string_view fmt);
 
 }  // namespace util
 }  // namespace logic
