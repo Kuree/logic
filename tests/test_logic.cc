@@ -709,6 +709,30 @@ TEST(logic, equal) {  // NOLINT
     }
 }
 
+TEST(logic, neq) {  // NOLINT
+    {
+        logic::logic a{true};
+        auto b = a != logic::logic<10>{1u};
+        EXPECT_EQ(b.str(), "0");
+    }
+
+    {
+        // with big number
+        logic::logic<120 - 1, 0> a{std::numeric_limits<uint64_t>::max() - 1};
+        logic::logic<420 - 1, 0> b{std::numeric_limits<uint64_t>::max()};
+        auto c = a != b;
+        EXPECT_EQ(c.str(), "1");
+    }
+
+    {
+        // with x and z
+        logic::logic<1024 - 1, 0> a{"'bx"};
+        logic::logic<20 - 1, 0> b{12};
+        auto c = a != b;
+        EXPECT_EQ(c.str(), "x");
+    }
+}
+
 TEST(logic, add) {  // NOLINT
     {
         // big number

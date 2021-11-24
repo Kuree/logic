@@ -514,6 +514,15 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    bool operator!=(const bit<op_msb, op_lsb, op_signed> &v) const {
+        if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
+            return value != static_cast<T>(v.value);
+        } else {
+            return value != v.value;
+        }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     bool operator>(const bit<op_msb, op_lsb, op_signed> &v) const {
         if constexpr (native_num && bit<op_msb, op_lsb>::native_num) {
             // LRM specifies that on ly if both operands are signed we do signed comparison

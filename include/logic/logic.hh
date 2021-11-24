@@ -534,6 +534,12 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator!=(const logic<op_msb, op_lsb, op_signed> &target) const {
+        if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
+        return value != target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     logic<0> operator>(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value > target.value ? one_() : zero_();
