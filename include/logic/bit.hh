@@ -522,7 +522,10 @@ public:
         }
     }
 
-    [[nodiscard]] bool match(const bit<msb, lsb, signed_> &op) const { return (*this) == op; }
+    template <int op_msb, int op_lsb, bool op_signed>
+    [[nodiscard]] bool match(const bit<op_msb, op_lsb, op_signed> &op) const {
+        return (*this) == op;
+    }
 
     template <int op_msb, int op_lsb, bool op_signed>
     bool operator>(const bit<op_msb, op_lsb, op_signed> &v) const {

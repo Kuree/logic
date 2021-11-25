@@ -539,8 +539,9 @@ public:
         return value != target.value ? one_() : zero_();
     }
 
-    [[nodiscard]] bool match(const logic<msb, lsb, signed_> &op) const {
-        return value.match(op.value) && xz_mask.match(op.xz_mask);
+    template <int op_msb, int op_lsb, bool op_signed>
+    [[nodiscard]] bool match(const logic<op_msb, op_lsb, op_signed> &op) const {
+        return value == op.value && xz_mask == op.xz_mask;
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
