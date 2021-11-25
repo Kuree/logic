@@ -1192,3 +1192,11 @@ TEST(logic, format) {  // NOLINT
         EXPECT_EQ(s, "FGHIJKLMNOPQRST");
     }
 }
+
+TEST(logic, match) {    // NOLINT
+    logic::logic<31, 0> a;
+    logic::logic<31, 0> b;
+    EXPECT_TRUE(a.match(b));
+    b = logic::logic<31, 0>("'b1xxxx");
+    EXPECT_FALSE(a.match(b));
+}
