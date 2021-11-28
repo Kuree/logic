@@ -819,27 +819,6 @@ private:
         // noop to keep gcc happy
     }
 
-    static constexpr logic<0> x_() {
-        logic<0> r;
-        r.value.value = false;
-        r.xz_mask.value = true;
-        return r;
-    }
-
-    static constexpr logic<0> one_() {
-        logic<0> r;
-        r.value.value = true;
-        r.xz_mask.value = false;
-        return r;
-    }
-
-    static constexpr logic<0> zero_() {
-        logic<0> r;
-        r.value.value = false;
-        r.xz_mask.value = false;
-        return r;
-    }
-
     template <bool l_signed>
     void set_(uint64_t idx, const logic<0, 0, l_signed> &l) {
         value.set(idx, l.value.value);
@@ -898,6 +877,27 @@ protected:
             auto b = op.operator[](idx - start);
             set_(i, b);
         }
+    }
+
+    static constexpr logic<0> x_() {
+        logic<0> r;
+        r.value.value = false;
+        r.xz_mask.value = true;
+        return r;
+    }
+
+    static constexpr logic<0> one_() {
+        logic<0> r;
+        r.value.value = true;
+        r.xz_mask.value = false;
+        return r;
+    }
+
+    static constexpr logic<0> zero_() {
+        logic<0> r;
+        r.value.value = false;
+        r.xz_mask.value = false;
+        return r;
     }
 };
 
