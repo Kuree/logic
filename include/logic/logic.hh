@@ -788,6 +788,28 @@ public:
         return *this;
     }
 
+    // useful constants
+    static constexpr logic<0> x_() {
+        logic<0> r;
+        r.value.value = false;
+        r.xz_mask.value = true;
+        return r;
+    }
+
+    static constexpr logic<0> one_() {
+        logic<0> r;
+        r.value.value = true;
+        r.xz_mask.value = false;
+        return r;
+    }
+
+    static constexpr logic<0> zero_() {
+        logic<0> r;
+        r.value.value = false;
+        r.xz_mask.value = false;
+        return r;
+    }
+
 private:
     void unmask_bit(uint64_t idx) { xz_mask.set(idx, false); }
 
@@ -877,27 +899,6 @@ protected:
             auto b = op.operator[](idx - start);
             set_(i, b);
         }
-    }
-
-    static constexpr logic<0> x_() {
-        logic<0> r;
-        r.value.value = false;
-        r.xz_mask.value = true;
-        return r;
-    }
-
-    static constexpr logic<0> one_() {
-        logic<0> r;
-        r.value.value = true;
-        r.xz_mask.value = false;
-        return r;
-    }
-
-    static constexpr logic<0> zero_() {
-        logic<0> r;
-        r.value.value = false;
-        r.xz_mask.value = false;
-        return r;
     }
 };
 
