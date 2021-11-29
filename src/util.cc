@@ -489,10 +489,14 @@ std::string fmt_decimal(uint64_t size, uint64_t value, uint64_t xz_mask) {
         }
     } else {
         std::stringstream ss;
-        while (value > 0) {
-            auto r = value % 10;
-            ss << r;
-            value /= 10;
+        if (value == 0) {
+            ss << 0;
+        } else {
+            while (value > 0) {
+                auto r = value % 10;
+                ss << r;
+                value /= 10;
+            }
         }
         return ss.str();
     }

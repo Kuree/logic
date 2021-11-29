@@ -1191,6 +1191,14 @@ TEST(logic, format) {  // NOLINT
         auto s = a.str("s");
         EXPECT_EQ(s, "FGHIJKLMNOPQRST");
     }
+
+    {
+        // some regressions
+        auto a = logic::logic<3>{};
+        a = logic::logic<31, 0>(0);
+        auto s = a.str("0d");
+        EXPECT_EQ(s, "0");
+    }
 }
 
 TEST(logic, match) {    // NOLINT
