@@ -1208,3 +1208,16 @@ TEST(logic, match) {    // NOLINT
     b = logic::logic<31, 0>("'b1xxxx");
     EXPECT_FALSE(a.match(b));
 }
+
+TEST(logic, indecrement) {  // NOLINT
+    using namespace logic::literals;
+    logic::logic<42, 0> a{42};
+    a++;
+    EXPECT_EQ(a, 43_logic);
+    a--;
+    EXPECT_EQ(a, 42_logic);
+    ++a;
+    EXPECT_EQ(a, 43_logic);
+    --a;
+    EXPECT_EQ(a, 42_logic);
+}

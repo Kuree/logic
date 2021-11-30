@@ -437,6 +437,30 @@ public:
         return res;
     }
 
+    auto &operator++() {
+        (*this) = (*this) + one_();
+        return *this;
+    }
+
+    auto &operator--() {
+        (*this) = (*this) - one_();
+        return *this;
+    }
+
+    // NOLINTNEXTLINE
+    bit<size -1, 0, signed_> operator++(int) {
+        bit<size -1, 0, signed_> v = *this;
+        this->operator++();
+        return v;
+    }
+
+    // NOLINTNEXTLINE
+    bit<size -1, 0, signed_> operator--(int) {
+        bit<size -1, 0, signed_> v = *this;
+        this->operator--();
+        return v;
+    }
+
     template <int op_msb, int op_lsb, bool op_signed>
     bit<size - 1, 0, util::signed_result(signed_, op_signed)> &operator>>=(
         const bit<op_msb, op_lsb, op_signed> &amount) {
@@ -864,6 +888,12 @@ public:
     bit &operator=(const bit<new_msb, new_lsb, new_signed> &b) {
         value = b.value;
         return *this;
+    }
+
+    static constexpr bit<0> one_() {
+        bit<0> r;
+        r.value = true;
+        return r;
     }
 
 private:

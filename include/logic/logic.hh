@@ -454,6 +454,30 @@ public:
 
     [[nodiscard]] logic<0> r_xnor() const { return !r_xor(); }
 
+    auto &operator++() {
+        (*this) = (*this) + one_();
+        return *this;
+    }
+
+    auto &operator--() {
+        (*this) = (*this) - one_();
+        return *this;
+    }
+
+    // NOLINTNEXTLINE
+    logic<size -1, 0, signed_> operator++(int) {
+        logic<size -1, 0, signed_> v = *this;
+        this->operator++();
+        return v;
+    }
+
+    // NOLINTNEXTLINE
+    logic<size -1, 0, signed_> operator--(int) {
+        logic<size -1, 0, signed_> v = *this;
+        this->operator--();
+        return v;
+    }
+
     template <int op_msb, int op_lsb, bool op_signed>
     auto operator>>(const logic<op_msb, op_lsb, op_signed> &amount) const {
         logic<size - 1, 0, util::signed_result(signed_, op_signed)> res;
