@@ -448,15 +448,15 @@ public:
     }
 
     // NOLINTNEXTLINE
-    bit<size -1, 0, signed_> operator++(int) {
-        bit<size -1, 0, signed_> v = *this;
+    bit<size - 1, 0, signed_> operator++(int) {
+        bit<size - 1, 0, signed_> v = *this;
         this->operator++();
         return v;
     }
 
     // NOLINTNEXTLINE
-    bit<size -1, 0, signed_> operator--(int) {
-        bit<size -1, 0, signed_> v = *this;
+    bit<size - 1, 0, signed_> operator--(int) {
+        bit<size - 1, 0, signed_> v = *this;
         this->operator--();
         return v;
     }

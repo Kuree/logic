@@ -465,15 +465,15 @@ public:
     }
 
     // NOLINTNEXTLINE
-    logic<size -1, 0, signed_> operator++(int) {
-        logic<size -1, 0, signed_> v = *this;
+    logic<size - 1, 0, signed_> operator++(int) {
+        logic<size - 1, 0, signed_> v = *this;
         this->operator++();
         return v;
     }
 
     // NOLINTNEXTLINE
-    logic<size -1, 0, signed_> operator--(int) {
-        logic<size -1, 0, signed_> v = *this;
+    logic<size - 1, 0, signed_> operator--(int) {
+        logic<size - 1, 0, signed_> v = *this;
         this->operator--();
         return v;
     }
