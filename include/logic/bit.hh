@@ -868,7 +868,7 @@ public:
 
     explicit constexpr bit(T v) requires(util::native_num(size)) : value(v) {}
     template <typename K>
-    requires(std::is_arithmetic_v<K> && !util::native_num(size)) explicit constexpr bit(K v)
+    requires(std::is_arithmetic_v<K> && !util::native_num(size)) constexpr bit(K v)  // NOLINT
         : value(v) {}
 
     template <uint64_t new_size, bool new_signed>
@@ -888,6 +888,11 @@ public:
     bit &operator=(const bit<new_msb, new_lsb, new_signed> &b) {
         value = b.value;
         return *this;
+    }
+
+    template <int new_msb, int new_lsb>
+    constexpr bit(const bit<new_msb, new_lsb, true> &b) {  // NOLINT
+        value = b.value;
     }
 
     static constexpr bit<0> one_() {

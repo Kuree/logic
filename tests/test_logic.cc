@@ -1221,3 +1221,9 @@ TEST(logic, indecrement) {  // NOLINT
     --a;
     EXPECT_EQ(a, 42_logic);
 }
+
+TEST(logic, conversion) {   // NOLINT
+    using namespace logic::literals;
+    logic::logic<31, 0> a = 42_logic;
+    EXPECT_EQ(a.to_uint64(), 42);
+}

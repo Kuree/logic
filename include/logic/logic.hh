@@ -782,7 +782,8 @@ public:
     constexpr logic() { xz_mask.mask(); }
 
     template <typename T>
-    explicit constexpr logic(T value) : value(bit<msb, lsb, signed_>(value)) {}
+    constexpr logic(T value) requires(std::is_arithmetic_v<T>)  // NOLINT
+        : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit constexpr logic(std::string_view v) {
@@ -810,6 +811,12 @@ public:
         value = b.value;
         xz_mask = b.xz_mask;
         return *this;
+    }
+
+    template <int new_msb, int new_lsb>
+    constexpr logic(const logic<new_msb, new_lsb, true> &b) {  // NOLINT
+        value = b.value;
+        xz_mask = b.xz_mask;
     }
 
     // useful constants
