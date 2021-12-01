@@ -1201,7 +1201,7 @@ TEST(logic, format) {  // NOLINT
     }
 }
 
-TEST(logic, match) {    // NOLINT
+TEST(logic, match) {  // NOLINT
     logic::logic<31, 0> a;
     logic::logic<31, 0> b;
     EXPECT_TRUE(a.match(b));
@@ -1222,8 +1222,20 @@ TEST(logic, indecrement) {  // NOLINT
     EXPECT_EQ(a, 42_logic);
 }
 
-TEST(logic, conversion) {   // NOLINT
+TEST(logic, conversion) {  // NOLINT
     using namespace logic::literals;
     logic::logic<31, 0> a = 42_logic;
     EXPECT_EQ(a.to_uint64(), 42);
+}
+
+TEST(logic, signed_unsigned_1bit) {  // NOLINT
+    using namespace logic::literals;
+    /*
+    logic::logic<0, 0, true> a{true};
+    auto b = a.slice<0, 0>().to_unsigned();
+    EXPECT_EQ(b.to_uint64(), 1);
+     */
+
+    auto clk = ((1_logic)).slice<0, 0>().to_unsigned();
+    EXPECT_EQ(clk.to_uint64(), 1);
 }

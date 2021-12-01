@@ -744,7 +744,11 @@ public:
     [[nodiscard]] bit<size - 1, 0, true> to_signed() const {
         bit<size - 1, 0, true> res;
         if constexpr (native_num) {
-            res.value = static_cast<decltype(bit<size - 1, 0, true>::value)>(value);
+            if constexpr (size == 1) {
+                res.value = value;
+            } else {
+                res.value = static_cast<decltype(bit<size - 1, 0, true>::value)>(value);
+            }
         } else {
             res.value = value.to_signed();
         }
@@ -754,7 +758,11 @@ public:
     [[nodiscard]] bit<size - 1, 0, false> to_unsigned() const {
         bit<size - 1, 0, false> res;
         if constexpr (native_num) {
-            res.value = static_cast<decltype(bit<size - 1, 0, false>::value)>(value);
+            if constexpr (size == 1) {
+                res.value = value;
+            } else {
+                res.value = static_cast<decltype(bit<size - 1, 0, false>::value)>(value);
+            }
         } else {
             // big number is always unsigned
             res.value = value;
@@ -963,12 +971,16 @@ protected:
         constexpr auto max = util::max(a, b) - base;
         constexpr auto min = util::min(a, b) - base;
         constexpr auto t_size = sizeof(T) * 8;
-        bit<util::abs_diff(a, b), false> result;
-        constexpr auto default_mask = std::numeric_limits<T>::max();
-        uint64_t mask = default_mask << min;
-        mask &= (default_mask >> (t_size - max - 1));
-        result.value = (value & mask) >> min;
-
+        constexpr auto target_size = util::abs_diff(a, b) + 1;
+        bit<target_size - 1, false> result;
+        if constexpr (target_size == 1) {
+            result.value = value != 0;
+        } else {
+            constexpr auto default_mask = std::numeric_limits<T>::max();
+            uint64_t mask = default_mask << min;
+            mask &= (default_mask >> (t_size - max - 1));
+            result.value = (value & mask) >> min;
+        }
         return result;
     }
 
