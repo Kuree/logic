@@ -782,7 +782,11 @@ public:
 
     void mask() {
         if constexpr (native_num) {
-            value = std::numeric_limits<T>::max() >> (sizeof(T) * 8 - size);
+            if constexpr (size == 1) {
+                value = true;
+            } else {
+                value = std::numeric_limits<T>::max() >> (sizeof(T) * 8 - size);
+            }
         } else {
             value.mask();
         }
