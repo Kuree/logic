@@ -413,6 +413,20 @@ std::string to_string(std::string_view fmt, uint64_t size, uint64_t value, bool 
                 auto c = value >> (i * 8) & 0xFF;
                 ss << c;
             }
+            break;
+        case 'd':
+        case 'D': {
+            if (value == 0) {
+                ss << 0;
+            } else {
+                while (value > 0) {
+                    auto r = value % 10;
+                    ss << r;
+                    value /= 10;
+                }
+            }
+            break;
+        }
         default:;
     }
     return pad_result(is_negative, base, actual_size, padding, ss);
