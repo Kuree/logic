@@ -909,7 +909,14 @@ protected:
             } else {
                 idx = i;
             }
-            auto b = op.operator[](idx - start);
+            idx = idx - start;
+            logic<0, 0> b;
+            if (idx > util::max(op_lo, op_hi) || idx < util::min(op_lo, op_hi)) {
+                // out of bound access, set to 0
+                b = zero_();
+            } else {
+                b = op.operator[](idx);
+            }
             set_(i, b);
         }
     }
@@ -927,7 +934,14 @@ protected:
             } else {
                 idx = i;
             }
-            auto b = op.operator[](idx - start);
+            idx = idx - start;
+            logic<0, 0> b;
+            if (idx > util::max(op_lo, op_hi) || idx < util::min(op_lo, op_hi)) {
+                // out of bound access, set to 0
+                b = zero_();
+            } else {
+                b = op.operator[](idx);
+            }
             set_(i, b);
         }
     }
