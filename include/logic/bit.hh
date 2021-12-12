@@ -887,6 +887,11 @@ public:
     explicit bit(const big_num<new_size, new_signed> &big_num) requires(size <= big_num_threshold)
         : value(big_num.values[0]) {}
 
+    template <uint64_t op_hi, uint64_t op_lo, bool op_signed>
+    constexpr bit(logic<op_hi, op_lo, op_signed> &&logic) {
+        *this = logic.value;
+    }
+
     bit() {
         if constexpr (native_num) {
             // init to 0
@@ -1038,13 +1043,11 @@ inline namespace literals {
 // constexpr to parse SystemVerilog literals
 // per LRM, if size not specified, the default size is 32
 //     it will be signed as well
-// in C++ we only allow unsigned integer. as a result, we will create a number that's
-// 1 bit less to account for negative number
 constexpr bit<31, 0, true> operator""_bit(unsigned long long value) {
-    return bit<30, 0, true>(static_cast<int32_t>(value)).extend<32>();
+    return bit<31, 0, true>(static_cast<int32_t>(value)).extend<32>();
 }
 constexpr bit<63, 0, true> operator""_bit64(unsigned long long value) {
-    return bit<62, 0, true>(static_cast<int64_t>(value)).extend<64>();
+    return bit<63, 0, true>(static_cast<int64_t>(value)).extend<64>();
 }
 }  // namespace literals
 

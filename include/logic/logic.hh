@@ -270,6 +270,12 @@ public:
         return result;
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template operator&(logic(op));
+    }
+
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
     requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto and_(
         const logic<op_msb, op_lsb, op_signed> &op) const {
@@ -329,6 +335,12 @@ public:
         return result;
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template operator|(logic(op));
+    }
+
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
     requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto or_(
         const logic<op_msb, op_lsb, op_signed> &op) const {
@@ -375,6 +387,12 @@ public:
         // we use that to create a msk of change everything into x
         result.value &= ~result.xz_mask;
         return result;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template operator^(logic(op));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
@@ -492,6 +510,12 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator>>(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template operator>>(logic(op));
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     logic<size - 1, 0, util::signed_result(signed_, op_signed)> &operator>>=(
         const logic<op_msb, op_lsb, op_signed> &amount) {
         auto res = (*this) >> amount;
@@ -511,6 +535,12 @@ public:
             res.xz_mask = xz_mask << amount.value;
         }
         return res;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator<<(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template operator<<(logic(op));
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
@@ -548,6 +578,11 @@ public:
         return res;
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto ashl(const bit<op_msb, op_lsb, op_signed> &amount) const {
+        return this->template ashl(logic(amount));
+    }
+
     /*
      * comparators
      */
@@ -558,14 +593,29 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator==(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator==(logic(target));
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     logic<0> operator!=(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value != target.value ? one_() : zero_();
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator!=(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator!=(logic(target));
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     [[nodiscard]] bool match(const logic<op_msb, op_lsb, op_signed> &op) const {
         return value == op.value && xz_mask == op.xz_mask;
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    [[nodiscard]] bool match(const bit<op_msb, op_lsb, op_signed> &op) const {
+        return this->template match(logic(op));
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
@@ -575,9 +625,19 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator>(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator>(logic(target));
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     logic<0> operator<(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value < target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator<(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator<(logic(target));
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
@@ -587,9 +647,19 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator>=(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator>=(logic(target));
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
     logic<0> operator<=(const logic<op_msb, op_lsb, op_signed> &target) const {
         if (xz_mask.any_set() || target.xz_mask.any_set()) return x_();
         return value <= target.value ? one_() : zero_();
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    logic<0> operator<=(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator<=(logic(target));
     }
 
     constexpr auto operator-() const {
@@ -625,6 +695,11 @@ public:
         }
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator+(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator+(logic(target));
+    }
+
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
     requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto add(
         const logic<op_msb, op_lsb, op_signed> &op) const {
@@ -651,6 +726,11 @@ public:
         }
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator-(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator-(logic(target));
+    }
+
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
     requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto minus(
         const logic<op_msb, op_lsb, op_signed> &op) const {
@@ -675,6 +755,11 @@ public:
         } else {
             return logic<size - 1, 0, util::signed_result(signed_, op_signed)>{value * op.value};
         }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator*(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator*(logic(target));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
@@ -704,6 +789,11 @@ public:
         }
     }
 
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator/(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator/(logic(target));
+    }
+
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
     requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto divide(
         const logic<op_msb, op_lsb, op_signed> &op) const {
@@ -729,6 +819,11 @@ public:
         } else {
             return logic<size - 1, 0, util::signed_result(signed_, op_signed)>{value % op.value};
         }
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed>
+    auto operator%(const bit<op_msb, op_lsb, op_signed> &target) const {
+        return this->template operator%(logic(target));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
@@ -797,7 +892,8 @@ public:
     }
 
     // conversion from bit to logic
-    constexpr explicit logic(bit<msb, lsb, signed_> &&b) : value(std::move(b)) {}
+    constexpr logic(const bit<msb, lsb, signed_> &b) : value(b) {}
+
     // shifting msb and lsb
     template <int new_msb, int new_lsb, bool new_signed>
     requires(util::abs_diff(new_msb, new_lsb) ==
@@ -951,13 +1047,11 @@ inline namespace literals {
 // constexpr to parse SystemVerilog literals
 // per LRM, if size not specified, the default size is 32
 //     it will be signed as well
-// in C++ we only allow unsigned integer. as a result, we will create a number that's
-// 1 bit less to account for negative number
 constexpr logic<31, 0, true> operator""_logic(unsigned long long value) {
-    return logic<30, 0, true>(static_cast<int32_t>(value)).extend<32>();
+    return logic<31, 0, true>(static_cast<int32_t>(value)).extend<32>();
 }
 constexpr logic<63, 0, true> operator""_logic64(unsigned long long value) {
-    return logic<62, 0, true>(static_cast<int64_t>(value)).extend<64>();
+    return logic<63, 0, true>(static_cast<int64_t>(value)).extend<64>();
 }
 }  // namespace literals
 
