@@ -86,7 +86,7 @@ public:
     logic<0> inline get(const logic<op_msb, op_lsb, op_signed, op_array> &op) const
         requires(!array) {
         uint64_t index;
-        if constexpr (logic<op_msb, op_lsb>::native_num) {
+        if constexpr (util::native_num(util::total_size(msb, lsb))) {
             index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
         } else {
             if (op.fit_in_64() && !op.xz_mask.any_set()) {
@@ -95,7 +95,22 @@ public:
                 return x_();
             }
         }
-        return get(index);
+        return operator[](index);
+    }
+
+    template <int op_msb, int op_lsb, bool op_signed, bool op_array>
+    logic<0> inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
+        uint64_t index;
+        if constexpr (util::native_num(util::total_size(msb, lsb))) {
+            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+        } else {
+            if (op.fit_in_64()) {
+                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+            } else {
+                return x_();
+            }
+        }
+        return operator[](index);
     }
 
     void set(uint64_t idx, bool v) requires(!array) {
