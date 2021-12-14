@@ -132,6 +132,14 @@ TEST(logic, unpack) {  // NOLINT
         EXPECT_EQ("0010", b.str());
         EXPECT_EQ("0011", c.str());
     }
+    {
+        logic::logic<5> a;
+        logic::logic<0> b;
+        auto c = logic::logic<6, 0>(42);
+        c.unpack(b, a);
+        EXPECT_EQ("101010", a.str());
+        EXPECT_EQ("0", b.str());
+    }
 }
 
 TEST(logic, bool_) {  // NOLINT
@@ -1230,11 +1238,9 @@ TEST(logic, conversion) {  // NOLINT
 
 TEST(logic, signed_unsigned_1bit) {  // NOLINT
     using namespace logic::literals;
-    /*
     logic::logic<0, 0, true> a{true};
     auto b = a.slice<0, 0>().to_unsigned();
     EXPECT_EQ(b.to_uint64(), 1);
-     */
 
     auto clk = ((1_logic)).slice<0, 0>().to_unsigned();
     EXPECT_EQ(clk.to_uint64(), 1);

@@ -1005,12 +1005,18 @@ protected:
         constexpr auto t_size = sizeof(T) * 8;
         constexpr auto target_size = util::abs_diff(a, b) + 1;
         bit<target_size - 1, false> result;
-        if constexpr (target_size == 1) {
+        if constexpr (target_size == 1 && size == 1) {
             result.value = value != 0;
         } else {
             constexpr auto default_mask = std::numeric_limits<T>::max();
             uint64_t mask = default_mask << min;
-            mask &= (default_mask >> (t_size - max - 1));
+            uint64_t shmnt;
+            if constexpr (signed_) {
+                shmnt = 2;
+            } else {
+                shmnt = 1;
+            }
+            mask &= (default_mask >> (t_size - max - shmnt));
             result.value = (value & mask) >> min;
         }
         return result;
