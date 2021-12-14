@@ -5,10 +5,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(BUILD_UNIT_TEST "Build unit test" OFF)
+
 add_subdirectory(src)
 
 # tests
-if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/extern/googletest/CMakeLists.txt)
+if (BUILD_UNIT_TEST)
     add_subdirectory(extern/googletest)
     include(GoogleTest)
     include (CTest)
