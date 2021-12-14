@@ -154,6 +154,8 @@ public:
         values[s - 1] &= mask;
     }
 
+    void clear() { std::fill(values.begin(), values.end(), 0); }
+
     /*
      * boolean operators
      */

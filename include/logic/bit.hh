@@ -277,6 +277,14 @@ public:
         }
     }
 
+    void clear() {
+        if constexpr (native_num) {
+            value = 0;
+        } else {
+            value.clear();
+        }
+    }
+
     /*
      * bitwise operators
      */
@@ -929,8 +937,23 @@ private:
         arg0.value = this->template slice<base, upper_bound>();
     }
 
+    template <int base, int arg0_msb, int arg0_lsb, bool arg0_signed>
+    requires(base < size) void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+        auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
+        auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
+        arg0.value = this->template slice<base, upper_bound>();
+        arg0.xz_mask.clear();
+    }
+
     template <int base = 0, int arg0_msb, int arg0_lsb, bool arg0_signed, typename... Ts>
     [[maybe_unused]] auto unpack_(bit<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
+        auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
+        this->template unpack_<base, arg0_msb, arg0_lsb, arg0_signed>(arg0);
+        this->template unpack_<base + arg0_size>(args...);
+    }
+
+    template <int base = 0, int arg0_msb, int arg0_lsb, bool arg0_signed, typename... Ts>
+    [[maybe_unused]] auto unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0, Ts &...args) const {
         auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
         this->template unpack_<base, arg0_msb, arg0_lsb, arg0_signed>(arg0);
         this->template unpack_<base + arg0_size>(args...);
