@@ -215,9 +215,19 @@ public:
         return res;
     }
 
+    template <int arg0_msb, int arg0_lsb, bool arg0_signed>
+    constexpr auto concat(const bit<arg0_msb, arg0_lsb, arg0_signed> &arg0) {
+        auto constexpr final_size = size + bit<arg0_msb, arg0_lsb, arg0_signed>::size;
+        auto res = logic<final_size - 1, 0, signed_>();
+        res.value = value.concat(arg0);
+        // concat masks as well
+        res.xz_mask = xz_mask.template extend<final_size>();
+        return res;
+    }
+
     template <typename U, typename... Ts>
     constexpr auto concat(U arg0, Ts... args) {
-        return concat(arg0).concat(args...);
+        return this->concat(arg0).concat(args...);
     }
 
     /*
@@ -1069,6 +1079,12 @@ constexpr logic<63, 0, true> operator""_logic64(unsigned long long value) {
     return logic<63, 0, true>(static_cast<int64_t>(value)).extend<64>();
 }
 }  // namespace literals
+
+// helper functions
+template <typename U, typename... Ts>
+auto concat(U arg0, Ts... args) {
+    return arg0.concat(args...);
+}
 
 }  // namespace logic
 #endif  // LOGIC_LOGIC_HH
