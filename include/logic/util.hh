@@ -54,7 +54,7 @@ inline uint64_t str_len(uint64_t size, std::string_view fmt) {
         return size;
     } else {
         auto num = fmt.substr(0, pos);
-        auto v = std::stoul(std::string(num));
+        uint64_t v = std::stoul(std::string(num));
         return max(size, v);
     }
 }
