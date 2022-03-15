@@ -905,6 +905,63 @@ public:
             return value.to_uint64();
     }
 
+    // automatic conversion
+    [[nodiscard]] int8_t to_num() const requires(signed_ &&size <= 8) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] uint8_t to_num() const requires(!signed_ && size <= 8) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] int16_t to_num() const requires(signed_ &&size > 8 && size <= 16) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] uint16_t to_num() const requires(!signed_ && size > 8 && size <= 16) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] int32_t to_num() const requires(signed_ &&size > 16 && size <= 32) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] uint32_t to_num() const requires(!signed_ && size > 16 && size <= 32) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] int64_t to_num() const requires(signed_ &&size > 32 && size <= 64) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
+    [[nodiscard]] uint64_t to_num() const requires(!signed_ && size > 32 && size <= 64) {
+        if (xz_mask.any_set())
+            return 0;
+        else
+            return value.to_num();
+    }
+
     /*
      * constructors
      */

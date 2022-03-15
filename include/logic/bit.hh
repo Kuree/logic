@@ -880,6 +880,34 @@ public:
         }
     }
 
+    [[nodiscard]] int8_t to_num() const requires(signed_ &&size <= 8) { return value; }
+
+    [[nodiscard]] uint8_t to_num() const requires(!signed_ && size <= 8) { return value; }
+
+    [[nodiscard]] int16_t to_num() const requires(signed_ &&size > 8 && size <= 16) {
+        return value;
+    }
+
+    [[nodiscard]] uint16_t to_num() const requires(!signed_ && size > 8 && size <= 16) {
+        return value;
+    }
+
+    [[nodiscard]] int32_t to_num() const requires(signed_ &&size > 16 && size <= 32) {
+        return value;
+    }
+
+    [[nodiscard]] uint32_t to_num() const requires(!signed_ && size > 16 && size <= 32) {
+        return value;
+    }
+
+    [[nodiscard]] int64_t to_num() const requires(signed_ &&size > 32 && size <= 64) {
+        return value;
+    }
+
+    [[nodiscard]] uint64_t to_num() const requires(!signed_ && size > 32 && size <= 64) {
+        return value;
+    }
+
     /*
      * constructors
      */
