@@ -12,7 +12,7 @@ template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct bit {
 public:
     constexpr static auto size = util::abs_diff(msb, lsb) + 1;
-    constexpr static auto big_endian = msb > lsb;
+    constexpr static auto big_endian = msb >= lsb;
     static_assert(size > 0, "0 sized logic not allowed");
     static constexpr bool native_num = util::native_num(size);
     constexpr static auto is_signed = signed_;

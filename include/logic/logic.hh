@@ -9,7 +9,7 @@ template <int msb, int lsb, bool signed_, bool array>
 struct logic {
 public:
     static auto constexpr size = util::abs_diff(msb, lsb) + 1;
-    constexpr static auto big_endian = msb > lsb;
+    constexpr static auto big_endian = msb >= lsb;
     constexpr static auto is_signed = signed_;
     constexpr static bool is_4state = true;
     bit<msb, lsb, signed_> value;

@@ -1245,3 +1245,26 @@ TEST(logic, signed_unsigned_1bit) {  // NOLINT
     auto clk = ((1_logic)).slice<0, 0>().to_unsigned();
     EXPECT_EQ(clk.to_uint64(), 1);
 }
+
+TEST(logic, conversion_num) {  // NOLINT
+    {
+        logic::logic<4, 0> a{4};
+        auto i = a.to_num();
+        ASSERT_EQ(sizeof(i), sizeof(uint8_t));
+    }
+
+    {
+        logic::logic<4, 0, true> a{-1};
+        auto i = a.to_num();
+        static_assert(std::is_same<decltype(i), int8_t>::value);
+    }
+
+    {
+        using namespace logic::literals;
+        auto a = 32_logic;
+        auto b = logic::logic{"1'bx"};
+        a.update<3>(b);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0);
+    }
+}
