@@ -71,7 +71,7 @@ public:
 
     template <uint64_t idx>
     requires(idx < size) [[nodiscard]] inline logic<0> get() const requires(!array) {
-        logic<0> r;
+        logic<0> r{false};
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
         } else if (this->template z_set<idx>()) [[unlikely]] {
