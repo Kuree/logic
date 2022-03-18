@@ -40,10 +40,10 @@ public:
     }
 
     // single bit
-    bool inline operator[](uint64_t idx) const requires(!array) { return get_(idx); }
+    bit<0> inline operator[](uint64_t idx) const requires(!array) { return get_(idx); }
 
     template <uint64_t idx>
-    requires(idx < size && native_num) [[nodiscard]] bool inline get() const requires(!array) {
+    requires(idx < size && native_num) [[nodiscard]] bit<0> inline get() const requires(!array) {
         return this->operator[](idx);
     }
 
@@ -89,6 +89,13 @@ public:
         } else {
             value.template set<i>(v);
         }
+    }
+
+    void inline set(uint64_t idx, bit<0> v) { value.set(idx, v.value); }
+
+    template <uint64_t idx>
+    void set(bit<0> v) requires(!array) {
+        this->template set<idx>(v.value);
     }
 
     template <uint64_t idx, bool v>
@@ -998,31 +1005,31 @@ private:
         return static_cast<T>(mask);
     }
 
-    [[nodiscard]] inline bool get_(int idx) const {
+    [[nodiscard]] inline bit<0> get_(int idx) const {
         if constexpr (!big_endian) {
             idx = lsb - idx;
         }
         if constexpr (native_num) {
-            return (value >> idx) & 1;
+            return bit<0>((value >> idx) & 1);
         } else {
-            return value[idx];
+            return bit<0>(value[idx]);
         }
     }
 
     template <int idx>
-    [[nodiscard]] inline bool get_() const {
+    [[nodiscard]] inline bit<0> get_() const {
         if constexpr (!big_endian) {
             constexpr auto idx_ = lsb - idx;
             if constexpr (native_num) {
-                return (value >> idx_) & 1;
+                return bit<0>((value >> idx_) & 1);
             } else {
-                return value.template get<idx_>();
+                return bit<0>(value.template get<idx_>());
             }
         } else {
             if constexpr (native_num) {
-                return (value >> idx) & 1;
+                return bit<0>((value >> idx) & 1);
             } else {
-                return value.template get<idx>();
+                return bit<0>(value.template get<idx>());
             }
         }
     }

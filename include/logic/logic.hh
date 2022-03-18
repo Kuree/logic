@@ -59,7 +59,7 @@ public:
             } else if (z_set(idx)) [[unlikely]] {
                 r.set_z(idx);
             } else {
-                r.value.value = value[idx];
+                r.value = value[idx];
                 r.xz_mask.value = false;
             }
             return r;
