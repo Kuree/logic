@@ -107,7 +107,7 @@ constexpr uint64_t parse_raw_str_(std::string_view value, char base) {
         }
         case 's':
         case 'S': {
-            for (auto i = 0u; i < std::min(8ul, value.size()); i++) {
+            for (auto i = 0u; i < std::min<uint64_t>(8ul, value.size()); i++) {
                 uint64_t c = static_cast<uint8_t>(value[value.size() - i - 1]);
                 result |= c << (i * 8);
             }
@@ -335,7 +335,7 @@ void parse_fmt(const std::string_view& fmt, uint64_t size, char& base, uint64_t&
         if (*requested_size == 0) {
             padding = false;
         } else {
-            actual_size = std::max(actual_size, *requested_size);
+            actual_size = std::max<uint64_t>(actual_size, *requested_size);
         }
     }
 }
