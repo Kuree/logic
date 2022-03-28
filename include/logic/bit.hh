@@ -955,6 +955,12 @@ public:
         return *this;
     }
 
+    template <typename T>
+    bit &operator=(T v) requires(std::is_arithmetic<T>::value) {
+        value = v;
+        return *this;
+    }
+
     template <int new_msb, int new_lsb>
     constexpr bit(const bit<new_msb, new_lsb, true> &b) {  // NOLINT
         value = b.value;

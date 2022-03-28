@@ -1001,6 +1001,13 @@ public:
         return *this;
     }
 
+    template <typename T>
+    logic &operator=(T v) requires(std::is_arithmetic_v<T>) {
+        value = v;
+        xz_mask = 0;
+        return *this;
+    }
+
     template <int new_msb, int new_lsb>
     constexpr logic(const logic<new_msb, new_lsb, true> &b) {  // NOLINT
         value = b.value;
