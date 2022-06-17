@@ -87,8 +87,6 @@ TEST(array, index) {  // NOLINT
         a = bit_array[idx];
         EXPECT_EQ(a.str(), "0000000000101010");
     }
-
-
 }
 
 TEST(unpacked_array, slice) {  // NOLINT

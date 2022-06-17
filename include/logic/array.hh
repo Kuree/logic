@@ -117,7 +117,8 @@ public:
     }
 
     template <typename IT>
-    requires(std::is_arithmetic_v<IT>) explicit packed_array(IT v) : VT(v) {}
+        requires(std::is_arithmetic_v<IT>)
+    explicit packed_array(IT v) : VT(v) {}
     explicit packed_array(std::string_view v) : VT(v) {}
 
     packed_array() = default;

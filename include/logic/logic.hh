@@ -51,7 +51,9 @@ public:
     /*
      * single bit
      */
-    inline logic<0> operator[](uint64_t idx) const requires(!array) {
+    inline logic<0> operator[](uint64_t idx) const
+        requires(!array)
+    {
         if (idx < size) [[likely]] {
             logic<0> r;
             if (x_set(idx)) [[unlikely]] {
@@ -70,7 +72,10 @@ public:
     }
 
     template <uint64_t idx>
-    requires(idx < size) [[nodiscard]] inline logic<0> get() const requires(!array) {
+        requires(idx < size) [
+            [nodiscard]] inline logic<0> get() const
+        requires(!array)
+    {
         logic<0> r{false};
         if (this->template x_set<idx>()) [[unlikely]] {
             r.set_x<idx>();
@@ -84,7 +89,8 @@ public:
 
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
     logic<0> inline get(const logic<op_msb, op_lsb, op_signed, op_array> &op) const
-        requires(!array) {
+        requires(!array)
+    {
         uint64_t index;
         if constexpr (util::native_num(util::total_size(msb, lsb))) {
             index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
@@ -99,7 +105,9 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
-    logic<0> inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
+    logic<0> inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const
+        requires(!array)
+    {
         uint64_t index;
         if constexpr (util::native_num(util::total_size(msb, lsb))) {
             index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
@@ -113,26 +121,34 @@ public:
         return operator[](index);
     }
 
-    void set(uint64_t idx, bool v) requires(!array) {
+    void set(uint64_t idx, bool v)
+        requires(!array)
+    {
         value.set(idx, v);
         // unmask bit
         unmask_bit(idx);
     }
 
     template <uint64_t idx>
-    void set(bool v) requires(!array) {
+    void set(bool v)
+        requires(!array)
+    {
         value.template set<idx>(v);
         this->template unmask_bit<idx>();
     }
 
     template <uint64_t idx, bool v>
-    void set() requires(!array) {
+    void set()
+        requires(!array)
+    {
         value.template set<idx, v>();
         this->template unmask_bit<idx>();
     }
 
     template <bool l_signed>
-    void set(uint64_t idx, const logic<0, 0, l_signed> &l) requires(!array) {
+    void set(uint64_t idx, const logic<0, 0, l_signed> &l)
+        requires(!array)
+    {
         set_(idx, l);
     }
 
@@ -176,8 +192,10 @@ public:
      * slices
      */
     template <int a, int b>
-    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice() const
-        requires(!array) {
+        requires(util::max(a, b) < size)
+    constexpr logic<util::abs_diff(a, b)> inline slice() const
+        requires(!array)
+    {
         return this->template slice_<a, b>();
     }
 
@@ -194,8 +212,8 @@ public:
      * extend
      */
     template <uint64_t target_size>
-    requires(target_size >= size)
-        [[nodiscard]] constexpr logic<target_size - 1, 0, signed_> extend() const {
+        requires(target_size >= size) [
+            [nodiscard]] constexpr logic<target_size - 1, 0, signed_> extend() const {
         logic<target_size - 1, 0, signed_> result;
         result.value = value.template extend<target_size>();
         result.xz_mask = xz_mask.template extend<target_size>();
@@ -261,8 +279,8 @@ public:
      */
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator&(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template and_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -296,14 +314,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
-        const bit<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator&(const bit<op_msb, op_lsb, op_signed> &op) const {
         return this->template operator&(logic(op));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto and_(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto and_(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l & r;
@@ -320,8 +338,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator|(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template or_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -361,14 +379,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
-        const bit<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator|(const bit<op_msb, op_lsb, op_signed> &op) const {
         return this->template operator|(logic(op));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto or_(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto or_(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -385,8 +403,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator^(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template xor_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -415,14 +433,14 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
-        const bit<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator^(const bit<op_msb, op_lsb, op_signed> &op) const {
         return this->template operator^(logic(op));
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto xor_(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto xor_(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -535,8 +553,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator>>(
-        const bit<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator>>(const bit<op_msb, op_lsb, op_signed> &op) const {
         return this->template operator>>(logic(op));
     }
 
@@ -563,8 +581,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator<<(
-        const bit<op_msb, op_lsb, op_signed> &op) const {
+        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
+    auto operator<<(const bit<op_msb, op_lsb, op_signed> &op) const {
         return this->template operator<<(logic(op));
     }
 
@@ -715,8 +733,8 @@ public:
      */
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(logic<op_msb, op_lsb>::size != size) auto operator+(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(logic<op_msb, op_lsb>::size != size)
+    auto operator+(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -736,8 +754,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto add(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto add(const logic<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -746,8 +764,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(logic<op_msb, op_lsb>::size != size) auto operator-(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(logic<op_msb, op_lsb>::size != size)
+    auto operator-(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -767,8 +785,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto minus(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto minus(const logic<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -777,8 +795,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(logic<op_msb, op_lsb>::size != size) auto operator*(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(logic<op_msb, op_lsb>::size != size)
+    auto operator*(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template multiply<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -798,8 +816,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto multiply(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto multiply(const logic<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -808,8 +826,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(logic<op_msb, op_lsb>::size != size) auto operator/(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(logic<op_msb, op_lsb>::size != size)
+    auto operator/(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template divide<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -830,8 +848,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto divide(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto divide(const logic<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -840,8 +858,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-    requires(logic<op_msb, op_lsb>::size != size) auto operator%(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(logic<op_msb, op_lsb>::size != size)
+    auto operator%(const logic<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, logic<op_msb, op_lsb>::size);
         return this->template mod<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -862,8 +880,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-    requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size)) auto mod(
-        const logic<op_msb, op_lsb, op_signed> &op) const {
+        requires(target_size >= util::max(size, logic<op_msb, op_lsb>::size))
+    auto mod(const logic<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -890,8 +908,10 @@ public:
      */
     // setting values
     template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
-    requires(!array) void update(const logic<op_hi, op_lo, op_signed> &op) requires(
-        hi < size && lo < size && util::match_endian(hi, lo, msb, lsb)) {
+        requires(!array)
+    void update(const logic<op_hi, op_lo, op_signed> &op)
+        requires(hi < size && lo < size && util::match_endian(hi, lo, msb, lsb))
+    {
         this->template update_<hi, lo>(op);
     }
 
@@ -906,56 +926,72 @@ public:
     }
 
     // automatic conversion
-    [[nodiscard]] int8_t to_num() const requires(signed_ &&size <= 8) {
+    [[nodiscard]] int8_t to_num() const
+        requires(signed_ && size <= 8)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] uint8_t to_num() const requires(!signed_ && size <= 8) {
+    [[nodiscard]] uint8_t to_num() const
+        requires(!signed_ && size <= 8)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] int16_t to_num() const requires(signed_ &&size > 8 && size <= 16) {
+    [[nodiscard]] int16_t to_num() const
+        requires(signed_ && size > 8 && size <= 16)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] uint16_t to_num() const requires(!signed_ && size > 8 && size <= 16) {
+    [[nodiscard]] uint16_t to_num() const
+        requires(!signed_ && size > 8 && size <= 16)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] int32_t to_num() const requires(signed_ &&size > 16 && size <= 32) {
+    [[nodiscard]] int32_t to_num() const
+        requires(signed_ && size > 16 && size <= 32)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] uint32_t to_num() const requires(!signed_ && size > 16 && size <= 32) {
+    [[nodiscard]] uint32_t to_num() const
+        requires(!signed_ && size > 16 && size <= 32)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] int64_t to_num() const requires(signed_ &&size > 32 && size <= 64) {
+    [[nodiscard]] int64_t to_num() const
+        requires(signed_ && size > 32 && size <= 64)
+    {
         if (xz_mask.any_set())
             return 0;
         else
             return value.to_num();
     }
 
-    [[nodiscard]] uint64_t to_num() const requires(!signed_ && size > 32 && size <= 64) {
+    [[nodiscard]] uint64_t to_num() const
+        requires(!signed_ && size > 32 && size <= 64)
+    {
         if (xz_mask.any_set())
             return 0;
         else
@@ -969,8 +1005,9 @@ public:
     constexpr logic() { xz_mask.mask(); }
 
     template <typename T>
-    constexpr logic(T value) requires(std::is_arithmetic_v<T>)  // NOLINT
-        : value(bit<msb, lsb, signed_>(value)) {}
+    constexpr logic(T value)
+        requires(std::is_arithmetic_v<T>)  // NOLINT
+    : value(bit<msb, lsb, signed_>(value)) {}
 
     explicit logic(const char *str) : logic(std::string_view(str)) {}
     explicit constexpr logic(std::string_view v) {
@@ -988,9 +1025,8 @@ public:
 
     // shifting msb and lsb
     template <int new_msb, int new_lsb, bool new_signed>
-    requires(util::abs_diff(new_msb, new_lsb) ==
-             util::abs_diff(msb,
-                            lsb)) explicit logic(const logic<new_msb, new_lsb, new_signed> &target)
+        requires(util::abs_diff(new_msb, new_lsb) == util::abs_diff(msb, lsb))
+    explicit logic(const logic<new_msb, new_lsb, new_signed> &target)
         : value(target.value), xz_mask(target.xz_mask) {}
 
     // implicit conversion via assignment
@@ -1002,7 +1038,9 @@ public:
     }
 
     template <typename T>
-    logic &operator=(T v) requires(std::is_arithmetic_v<T>) {
+    logic &operator=(T v)
+        requires(std::is_arithmetic_v<T>)
+    {
         value = v;
         xz_mask = 0;
         return *this;
@@ -1048,7 +1086,8 @@ private:
      * unpacking, which is basically slicing as syntax sugars
      */
     template <int base, int arg0_msb, int arg0_lsb, int arg0_signed>
-    requires(base < size) void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+        requires(base < size)
+    void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
         auto constexpr arg0_size = logic<arg0_msb, arg0_lsb, arg0_signed>::size;
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         arg0.value = value.template slice<base, upper_bound>();
@@ -1075,7 +1114,8 @@ private:
 
 protected:
     template <int a, int b>
-    requires(util::max(a, b) < size) constexpr logic<util::abs_diff(a, b)> inline slice_() const {
+        requires(util::max(a, b) < size)
+    constexpr logic<util::abs_diff(a, b)> inline slice_() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access will be X
             return logic<util::abs_diff(a, b)>{};
@@ -1090,9 +1130,9 @@ protected:
     }
 
     template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
-    void update_(const logic<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size &&
-                                                                    util::match_endian(hi, lo, msb,
-                                                                                       lsb)) {
+    void update_(const logic<op_hi, op_lo, op_signed> &op)
+        requires(hi < size && lo < size && util::match_endian(hi, lo, msb, lsb))
+    {
         auto constexpr start = util::min(hi, lo);
         auto constexpr end = util::max(hi, lo) + 1;
         for (auto i = start; i < end; i++) {

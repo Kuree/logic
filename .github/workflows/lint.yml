@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
@@ -18,4 +18,4 @@ jobs:
         git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
     - name: Run clang-format 📋
       shell: bash
-      run: clang-format-12 -n -Werror --style=file include/*/**.*
+      run: clang-format-14 -n -Werror --style=file include/*/**.*
