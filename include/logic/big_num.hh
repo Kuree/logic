@@ -29,8 +29,7 @@ public:
     }
 
     template <uint64_t idx>
-        requires(idx < size)
-    void set(bool value) {
+    requires(idx < size) void set(bool value) {
         auto constexpr a = idx / big_num_threshold;
         auto constexpr b = idx % big_num_threshold;
         if (value) {
@@ -41,8 +40,7 @@ public:
     }
 
     template <uint64_t idx, bool value>
-        requires(idx < size)
-    void set() {
+    requires(idx < size) void set() {
         auto constexpr a = idx / big_num_threshold;
         auto constexpr b = idx % big_num_threshold;
         if constexpr (value) {
@@ -76,15 +74,11 @@ public:
         }
     }
 
-    [[nodiscard]] bool negative() const
-        requires(signed_)
-    {
-        return this->operator[](size - 1);
-    }
+    [[nodiscard]] bool negative() const requires(signed_) { return this->operator[](size - 1); }
 
     template <uint64_t a, uint64_t b>
-        requires(util::max(a, b) < size)
-    big_num<util::abs_diff(a, b) + 1, false> inline slice() const {
+    requires(util::max(a, b) < size) big_num<util::abs_diff(a, b) + 1, false>
+    inline slice() const {
         if constexpr (size <= util::max(a, b)) {
             // out of bound access
             return big_num<util::abs_diff(a, b) + 1>(0);
@@ -188,8 +182,7 @@ public:
     // assignment, this also includes the left-hand side).
     // Care has to be taken to prevent loss of a significant bit during expression evaluation.
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator&(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator&(const big_num<op_size, op_signed> &op) const {
         return this->template and_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -205,8 +198,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto and_(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto and_(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -228,8 +221,7 @@ public:
     }
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator^(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator^(const big_num<op_size, op_signed> &op) const {
         return this->template xor_<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -244,8 +236,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto xor_(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto xor_(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -282,8 +274,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto or_(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto or_(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -489,8 +481,7 @@ public:
     }
 
     template <typename T>
-        requires(std::is_arithmetic_v<T>) bool
-    operator==(T v) const {
+    requires(std::is_arithmetic_v<T>) bool operator==(T v) const {
         auto v_casted = static_cast<uint64_t>(v);
         if (v_casted != values[0]) return false;
         return std::all_of(values.begin() + 1, values.end(), [](auto c) { return c == 0; });
@@ -531,8 +522,7 @@ public:
     }
 
     template <typename T>
-        requires(std::is_arithmetic_v<T>) bool
-    operator>(T v) const {
+    requires(std::is_arithmetic_v<T>) bool operator>(T v) const {
         auto constexpr is_signed = std::is_signed_v<T>();
         auto op = big_num<sizeof(T) * 8, is_signed>();
         op.values[0] = static_cast<uint64_t>(v);
@@ -545,8 +535,7 @@ public:
     }
 
     template <typename T>
-        requires(std::is_arithmetic_v<T>) bool
-    operator<=(T v) const {
+    requires(std::is_arithmetic_v<T>) bool operator<=(T v) const {
         auto constexpr is_signed = std::is_signed_v<T>();
         auto op = big_num<sizeof(T) * 8, is_signed>();
         op.values[0] = static_cast<uint64_t>(v);
@@ -559,8 +548,7 @@ public:
     }
 
     template <typename T>
-        requires(std::is_arithmetic_v<T>) bool
-    operator>=(T v) const {
+    requires(std::is_arithmetic_v<T>) bool operator>=(T v) const {
         auto constexpr is_signed = std::is_signed_v<T>();
         auto op = big_num<sizeof(T) * 8, is_signed>();
         op.values[0] = static_cast<uint64_t>(v);
@@ -577,8 +565,7 @@ public:
      */
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator+(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator+(const big_num<op_size, op_signed> &op) const {
         return this->template add<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -598,8 +585,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto add(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto add(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -608,8 +595,7 @@ public:
     }
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator-(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator-(const big_num<op_size, op_signed> &op) const {
         return this->template minus<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -621,8 +607,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto minus(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto minus(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -631,8 +617,7 @@ public:
     }
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator*(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator*(const big_num<op_size, op_signed> &op) const {
         return this->template multiply<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -682,8 +667,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto multiply(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto multiply(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -692,8 +677,7 @@ public:
     }
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator/(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator/(const big_num<op_size, op_signed> &op) const {
         return this->template divide<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -704,8 +688,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto divide(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto divide(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -714,8 +698,7 @@ public:
     }
 
     template <uint64_t op_size, bool op_signed>
-        requires(op_size != size)
-    auto operator%(const big_num<op_size, op_signed> &op) const {
+    requires(op_size != size) auto operator%(const big_num<op_size, op_signed> &op) const {
         return this->template mod<util::max(size, op_size), op_size, op_signed>(op);
     }
 
@@ -726,8 +709,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto mod(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto mod(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -736,8 +719,8 @@ public:
     }
 
     template <uint64_t target_size, uint64_t op_size, bool op_signed>
-        requires(target_size >= util::max(size, op_size))
-    auto power(const big_num<op_size, op_signed> &op) const {
+    requires(target_size >=
+             util::max(size, op_size)) auto power(const big_num<op_size, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         // power by squaring
@@ -863,9 +846,7 @@ public:
     }
 
     std::pair<big_num<size, false>, big_num<size, false>> div_mod_unsigned(
-        const big_num<size, false> &op) const
-        requires(!signed_)
-    {
+        const big_num<size, false> &op) const requires(!signed_) {
         // deal with some special cases
         if (op.is_one()) {
             return std::make_pair(*this, big_num<size, false>{0u});
@@ -919,7 +900,7 @@ public:
     constexpr explicit big_num(std::string_view v) { util::parse_raw_str(v, size, values.data()); }
 
     template <typename T>
-        requires std::is_arithmetic_v<T>
+    requires std::is_arithmetic_v<T>
     explicit constexpr big_num(T v) : values({v}) {
         if constexpr (signed_) {
             if (v < 0) {
@@ -936,8 +917,8 @@ public:
 
     // implicit conversion between signed and unsigned
     template <uint64_t op_size, bool op_signed>
-        requires(op_size == size && op_signed != signed_) [
-            [maybe_unused]] big_num(const big_num<op_size, op_signed> &op)  // NOLINT
+    requires(op_size == size && op_signed != signed_)
+        [[maybe_unused]] big_num(const big_num<op_size, op_signed> &op)  // NOLINT
         : values(op.values) {}
 
 private:

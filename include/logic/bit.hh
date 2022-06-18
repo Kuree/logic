@@ -40,24 +40,15 @@ public:
     }
 
     // single bit
-    bit<0> inline operator[](uint64_t idx) const
-        requires(!array)
-    {
-        return get_(idx);
-    }
+    bit<0> inline operator[](uint64_t idx) const requires(!array) { return get_(idx); }
 
     template <uint64_t idx>
-        requires(idx < size && native_num) [
-            [nodiscard]] bit<0> inline get() const
-        requires(!array)
-    {
+    requires(idx < size && native_num) [[nodiscard]] bit<0> inline get() const requires(!array) {
         return this->operator[](idx);
     }
 
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
-    bool inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const
-        requires(!array)
-    {
+    bool inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
         uint64_t index;
         if constexpr (bit<op_msb, op_lsb>::native_num) {
             index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
@@ -87,9 +78,7 @@ public:
     }
 
     template <uint64_t idx>
-    void set(bool v)
-        requires(!array)
-    {
+    void set(bool v) requires(!array) {
         constexpr auto i = !big_endian ? lsb - idx : idx;
         if constexpr (native_num) {
             if (v) {
@@ -105,16 +94,12 @@ public:
     void inline set(uint64_t idx, bit<0> v) { value.set(idx, v.value); }
 
     template <uint64_t idx>
-    void set(bit<0> v)
-        requires(!array)
-    {
+    void set(bit<0> v) requires(!array) {
         this->template set<idx>(v.value);
     }
 
     template <uint64_t idx, bool v>
-    void set()
-        requires(!array)
-    {
+    void set() requires(!array) {
         constexpr auto i = !big_endian ? lsb - idx : idx;
         if constexpr (native_num) {
             if constexpr (v) {
@@ -145,22 +130,15 @@ public:
      * native holder always produce native numbers
      */
     template <int a, int b>
-        requires(util::max(a, b) < size && native_num && b >= lsb)
-    bit<util::abs_diff(a, b)> constexpr inline slice() const
-        requires(!array)
-    {
-        return this->template slice_<a, b>();
-    }
+    requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
+    constexpr inline slice() const requires(!array) { return this->template slice_<a, b>(); }
 
     /*
      * big number but small slice
      */
     template <int a, int b>
-        requires(util::max(a, b) < size && !native_num && util::native_num(util::abs_diff(a, b)) &&
-                 b >= lsb)
-    constexpr bit<util::abs_diff(a, b)> inline slice() const
-        requires(!array)
-    {
+    requires(util::max(a, b) < size && !native_num && util::native_num(util::abs_diff(a, b)) &&
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const requires(!array) {
         bit<util::abs_diff(a, b), false> result;
         auto res = value.template slice<a, b>();
         // need to shrink it down
@@ -172,11 +150,8 @@ public:
      * big number and big slice
      */
     template <int a, int b>
-        requires(util::max(a, b) < size && !native_num && !util::native_num(util::abs_diff(a, b)) &&
-                 b >= lsb)
-    constexpr bit<util::abs_diff(a, b)> inline slice() const
-        requires(!array)
-    {
+    requires(util::max(a, b) < size && !native_num && !util::native_num(util::abs_diff(a, b)) &&
+             b >= lsb) constexpr bit<util::abs_diff(a, b)> inline slice() const requires(!array) {
         bit<util::abs_diff(a, b), false> result;
         result.value = value.template slice<a, b>();
         return result;
@@ -191,28 +166,28 @@ public:
     // notice that we need to implement signed extension, for the result that's native holder
     // C++ will handle that for us already.
     template <uint64_t target_size>
-        requires(target_size > size && util::native_num(target_size)) [
-            [nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+    requires(target_size > size && util::native_num(target_size))
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         return bit<target_size - 1, 0, signed_>(value);
     }
 
     template <uint64_t target_size>
-        requires(target_size == size) [
-            [nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+    requires(target_size == size)
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         return *this;
     }
 
     // new size is smaller. this is just a slice
     template <uint64_t target_size>
-        requires(target_size < size) [
-            [nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+    requires(target_size < size)
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         return slice<target_size - 1, 0>();
     }
 
     // native number, but extend to a big number
     template <uint64_t target_size>
-        requires(target_size > size && !util::native_num(target_size) && native_num) [
-            [nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+    requires(target_size > size && !util::native_num(target_size) && native_num)
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         bit<target_size - 1, 0, signed_> result;
         // use C++ default semantics to cast. if it's a negative number
         // the upper bit will be set properly
@@ -232,8 +207,8 @@ public:
 
     // big number and gets extended to a big number
     template <uint64_t target_size>
-        requires(target_size > size && !util::native_num(target_size) && !native_num) [
-            [nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
+    requires(target_size > size && !util::native_num(target_size) && !native_num)
+        [[nodiscard]] constexpr bit<target_size - 1, 0, signed_> extend() const {
         bit<target_size - 1, 0, signed_> res;
         res.value = value.template extend<target_size>();
         return res;
@@ -331,8 +306,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
-    auto operator&(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator&(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template and_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -345,8 +320,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto and_(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto and_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l & r;
@@ -364,8 +339,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
-    auto operator^(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator^(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template xor_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -378,8 +353,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto xor_(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto xor_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l ^ r;
@@ -397,8 +372,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires((util::abs_diff(op_msb, op_lsb) + 1) != size)
-    auto operator|(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires((util::abs_diff(op_msb, op_lsb) + 1) != size) auto operator|(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template or_<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -411,8 +386,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto or_(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto or_(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
         auto result = l | r;
@@ -430,18 +405,12 @@ public:
     }
 
     // reduction
-    [[nodiscard]] bool r_and() const
-        requires(native_num)
-    {
+    [[nodiscard]] bool r_and() const requires(native_num) {
         auto constexpr max = std::numeric_limits<T>::max() >> (sizeof(T) * 8 - size);
         return value == max;
     }
 
-    [[nodiscard]] bool r_and() const
-        requires(!native_num)
-    {
-        return value.r_xor();
-    }
+    [[nodiscard]] bool r_and() const requires(!native_num) { return value.r_xor(); }
 
     [[maybe_unused]] [[nodiscard]] bool r_nand() const { return !r_and(); }
 
@@ -449,9 +418,7 @@ public:
 
     [[maybe_unused]] [[nodiscard]] bool r_nor() const { return !r_or(); }
 
-    [[nodiscard]] bool r_xor() const
-        requires(native_num)
-    {
+    [[nodiscard]] bool r_xor() const requires(native_num) {
         bool b = get<0>();
         for (auto i = 1; i < size; i++) {
             b = b ^ get(i);
@@ -459,11 +426,7 @@ public:
         return b;
     }
 
-    [[nodiscard]] bool r_xor() const
-        requires(!native_num)
-    {
-        return value.r_xor();
-    }
+    [[nodiscard]] bool r_xor() const requires(!native_num) { return value.r_xor(); }
 
     [[maybe_unused]] [[nodiscard]] bool r_xnor() const { return !r_xor(); }
 
@@ -699,8 +662,8 @@ public:
      */
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires(bit<op_msb, op_lsb>::size != size)
-    auto operator+(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(bit<op_msb, op_lsb>::size != size) auto operator+(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template add<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -713,8 +676,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto add(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto add(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -723,8 +686,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires(bit<op_msb, op_lsb>::size != size)
-    auto operator-(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(bit<op_msb, op_lsb>::size != size) auto operator-(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template minus<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -737,8 +700,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto minus(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto minus(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -747,8 +710,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires(bit<op_msb, op_lsb>::size != size)
-    auto operator*(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(bit<op_msb, op_lsb>::size != size) auto operator*(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template multiply<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -761,8 +724,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto multiply(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto multiply(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -771,8 +734,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires(bit<op_msb, op_lsb>::size != size)
-    auto operator%(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(bit<op_msb, op_lsb>::size != size) auto operator%(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template mod<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -785,8 +748,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto mod(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto mod(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -795,8 +758,8 @@ public:
     }
 
     template <int op_msb, int op_lsb, bool op_signed>
-        requires(bit<op_msb, op_lsb>::size != size)
-    auto operator/(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(bit<op_msb, op_lsb>::size != size) auto operator/(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         auto constexpr target_size = util::max(size, bit<op_msb, op_lsb>::size);
         return this->template divide<target_size, op_msb, op_lsb, op_signed>(op);
     }
@@ -809,8 +772,8 @@ public:
     }
 
     template <uint64_t target_size, int op_msb, int op_lsb, bool op_signed>
-        requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size))
-    auto divide(const bit<op_msb, op_lsb, op_signed> &op) const {
+    requires(target_size >= util::max(size, bit<op_msb, op_lsb>::size)) auto divide(
+        const bit<op_msb, op_lsb, op_signed> &op) const {
         // resize things to target size
         auto l = this->template extend<target_size>();
         auto r = op.template extend<target_size>();
@@ -850,18 +813,12 @@ public:
     /*
      * mask related stuff
      */
-    [[nodiscard]] bool any_set() const
-        requires(native_num)
-    {
+    [[nodiscard]] bool any_set() const requires(native_num) {
         // unused bit are always set to 0
         return value != 0;
     }
 
-    [[nodiscard]] bool any_set() const
-        requires(!native_num)
-    {
-        return value.any_set();
-    }
+    [[nodiscard]] bool any_set() const requires(!native_num) { return value.any_set(); }
 
     void mask() {
         if constexpr (native_num) {
@@ -922,9 +879,7 @@ public:
      */
     // setting values
     template <uint64_t hi, uint64_t lo = hi, uint64_t op_hi, uint64_t op_lo, bool op_signed>
-    void update(const bit<op_hi, op_lo, op_signed> &op)
-        requires(hi < size && lo < size)
-    {
+    void update(const bit<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size) {
         auto constexpr start = util::min(hi, lo);
         auto constexpr end = util::max(hi, lo) + 1;
         for (auto i = start; i < end; i++) {
@@ -952,51 +907,31 @@ public:
         }
     }
 
-    [[nodiscard]] int8_t to_num() const
-        requires(signed_ && size <= 8)
-    {
+    [[nodiscard]] int8_t to_num() const requires(signed_ &&size <= 8) { return value; }
+
+    [[nodiscard]] uint8_t to_num() const requires(!signed_ && size <= 8) { return value; }
+
+    [[nodiscard]] int16_t to_num() const requires(signed_ &&size > 8 && size <= 16) {
         return value;
     }
 
-    [[nodiscard]] uint8_t to_num() const
-        requires(!signed_ && size <= 8)
-    {
+    [[nodiscard]] uint16_t to_num() const requires(!signed_ && size > 8 && size <= 16) {
         return value;
     }
 
-    [[nodiscard]] int16_t to_num() const
-        requires(signed_ && size > 8 && size <= 16)
-    {
+    [[nodiscard]] int32_t to_num() const requires(signed_ &&size > 16 && size <= 32) {
         return value;
     }
 
-    [[nodiscard]] uint16_t to_num() const
-        requires(!signed_ && size > 8 && size <= 16)
-    {
+    [[nodiscard]] uint32_t to_num() const requires(!signed_ && size > 16 && size <= 32) {
         return value;
     }
 
-    [[nodiscard]] int32_t to_num() const
-        requires(signed_ && size > 16 && size <= 32)
-    {
+    [[nodiscard]] int64_t to_num() const requires(signed_ &&size > 32 && size <= 64) {
         return value;
     }
 
-    [[nodiscard]] uint32_t to_num() const
-        requires(!signed_ && size > 16 && size <= 32)
-    {
-        return value;
-    }
-
-    [[nodiscard]] int64_t to_num() const
-        requires(signed_ && size > 32 && size <= 64)
-    {
-        return value;
-    }
-
-    [[nodiscard]] uint64_t to_num() const
-        requires(!signed_ && size > 32 && size <= 64)
-    {
+    [[nodiscard]] uint64_t to_num() const requires(!signed_ && size > 32 && size <= 64) {
         return value;
     }
 
@@ -1011,18 +946,14 @@ public:
         }
     }
 
-    explicit constexpr bit(T v)
-        requires(util::native_num(size))
-    : value(v) {}
+    explicit constexpr bit(T v) requires(util::native_num(size)) : value(v) {}
     template <typename K>
-        requires(std::is_arithmetic_v<K> && !util::native_num(size))
-    constexpr bit(K v)  // NOLINT
+    requires(std::is_arithmetic_v<K> && !util::native_num(size)) constexpr bit(K v)  // NOLINT
         : value(v) {}
 
     template <uint64_t new_size, bool new_signed>
-    explicit bit(const big_num<new_size, new_signed> &big_num)
-        requires(size <= big_num_threshold)
-    : value(big_num.values[0]) {}
+    explicit bit(const big_num<new_size, new_signed> &big_num) requires(size <= big_num_threshold)
+        : value(big_num.values[0]) {}
 
     template <uint64_t op_hi, uint64_t op_lo, bool op_signed>
     constexpr bit(logic<op_hi, op_lo, op_signed> &&logic) {
@@ -1045,9 +976,7 @@ public:
     }
 
     template <typename T>
-    bit &operator=(T v)
-        requires(std::is_arithmetic<T>::value)
-    {
+    bit &operator=(T v) requires(std::is_arithmetic<T>::value) {
         value = v;
         return *this;
     }
@@ -1068,16 +997,14 @@ private:
      * unpacking, which is basically slicing as syntax sugars
      */
     template <int base, int arg0_msb, int arg0_lsb, bool arg0_signed>
-        requires(base < size)
-    void unpack_(bit<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+    requires(base < size) void unpack_(bit<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
         auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         arg0.value = this->template slice<base, upper_bound>();
     }
 
     template <int base, int arg0_msb, int arg0_lsb, bool arg0_signed>
-        requires(base < size)
-    void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
+    requires(base < size) void unpack_(logic<arg0_msb, arg0_lsb, arg0_signed> &arg0) const {
         auto constexpr arg0_size = bit<arg0_msb, arg0_lsb, arg0_signed>::size;
         auto constexpr upper_bound = util::min(size - 1, arg0_size + base - 1);
         arg0.value = this->template slice<base, upper_bound>();
@@ -1135,8 +1062,8 @@ private:
 
 protected:
     template <int a, int b>
-        requires(util::max(a, b) < size && native_num && b >= lsb)
-    bit<util::abs_diff(a, b)> constexpr inline slice_() const {
+    requires(util::max(a, b) < size && native_num && b >= lsb) bit<util::abs_diff(a, b)>
+    constexpr inline slice_() const {
         // assume the import has type-checked properly, e.g. by a compiler
         constexpr auto base = util::min(msb, lsb);
         constexpr auto max = util::max(a, b) - base;
