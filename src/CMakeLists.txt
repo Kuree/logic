@@ -6,3 +6,8 @@ if(MSVC)
 else()
     target_compile_options(logic PRIVATE -Wall -Wextra -Wpedantic -Werror -Wno-unknown-attributes)
 endif()
+
+# only for windows and clang
+if (WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+    target_link_libraries(logic PRIVATE clang_rt.builtins-x86_64.lib)
+endif()
