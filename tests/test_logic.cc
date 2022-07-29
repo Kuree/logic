@@ -108,6 +108,14 @@ TEST(logic, slice) {  // NOLINT
         auto d = a.slice<3, false>(b + 2_logic);
         EXPECT_EQ(d.to_num(), 7);
     }
+
+    {
+        using namespace logic::literals;
+        auto a = (65535_bit).to_signed();
+        auto b = 3_bit;
+        auto e = ((a).slice<8, true>(b)).extend<32>();
+        EXPECT_EQ(e.to_num(), 0xFF);
+    }
 }
 
 TEST(logic, literal) {  // NOLINT

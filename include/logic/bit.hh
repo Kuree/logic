@@ -287,7 +287,7 @@ public:
         if constexpr (native_num) {
             if constexpr (size > 1) {
                 auto constexpr amount = sizeof(T) * 8 - size;
-                auto constexpr mask_max = std::numeric_limits<T>::max();
+                auto constexpr mask_max = bit_mask();
                 auto mask = mask_max >> amount;
                 value &= mask;
             }
@@ -1086,7 +1086,7 @@ protected:
         if constexpr (target_size == 1 && size == 1) {
             result.value = value != 0;
         } else {
-            constexpr auto default_mask = std::numeric_limits<T>::max();
+            constexpr auto default_mask = bit_mask();
             uint64_t mask = default_mask << min;
             uint64_t shmnt;
             if constexpr (signed_) {
@@ -1095,7 +1095,7 @@ protected:
                 shmnt = 1;
             }
             mask &= (default_mask >> (t_size - max - shmnt));
-            result.value = (value & mask) >> min;
+            result.value = (value & static_cast<T>(mask)) >> min;
         }
         return result;
     }
@@ -1109,10 +1109,10 @@ protected:
             auto max = util::max(a, b) - base;
             auto min = util::min(a, b) - base;
             auto t_size = sizeof(T) * 8;
-            constexpr auto default_mask = std::numeric_limits<T>::max();
+            constexpr auto default_mask = bit_mask();
             uint64_t mask = default_mask << min;
             mask &= (default_mask >> (t_size - max - 1));
-            result.value = (value & mask) >> min;
+            result.value = (value & static_cast<T>(mask)) >> min;
 
             return result;
         } else {
@@ -1143,6 +1143,12 @@ protected:
             auto b = op.operator[](idx - start);
             set(i, b);
         }
+    }
+
+    // compute the mask in unsigned fashion
+    static constexpr auto bit_mask() requires (native_num) {
+        using TU = typename util::get_holder_type<size, false>::type;
+        return std::numeric_limits<TU>::max();
     }
 };
 
