@@ -190,6 +190,18 @@ public:
         return result;
     }
 
+    template <uint32_t target_size, bool increase = true, typename T>
+    auto slice(T base) const {
+        int end;
+        int base_value = static_cast<int>(base.to_num());
+        if constexpr (increase) {
+            end = base_value + static_cast<int>(target_size - 1);
+        } else {
+            end = base_value - static_cast<int>(target_size - 1);
+        }
+        return this->template slice<target_size>(base_value, end);
+    }
+
     /*
      * extend
      */

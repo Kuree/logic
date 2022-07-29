@@ -97,6 +97,17 @@ TEST(logic, slice) {  // NOLINT
         auto result = ss.str();
         EXPECT_EQ(result, s.str());
     }
+
+    {
+        using namespace logic::literals;
+        // slice with variable base
+        logic::logic<31, 0> a(0xFFFF);
+        logic::logic<10, 0> b(2);
+        auto c = a.slice<4, true>(b);
+        EXPECT_EQ(c.to_num(), 0xF);
+        auto d = a.slice<3, false>(b + 2_logic);
+        EXPECT_EQ(d.to_num(), 7);
+    }
 }
 
 TEST(logic, literal) {  // NOLINT
