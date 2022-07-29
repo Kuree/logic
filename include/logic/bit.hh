@@ -1146,7 +1146,7 @@ protected:
     }
 
     // compute the mask in unsigned fashion
-    static constexpr auto bit_mask() requires (native_num) {
+    static constexpr auto bit_mask() requires(native_num) {
         using TU = typename util::get_holder_type<size, false>::type;
         return std::numeric_limits<TU>::max();
     }
