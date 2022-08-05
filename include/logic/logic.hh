@@ -996,7 +996,10 @@ public:
     }
 
     // conversion from bit to logic
-    constexpr logic(const bit<msb, lsb, signed_> &b) : value(b) {}
+    template <bool new_signed>
+    constexpr logic(const bit<msb, lsb, new_signed> &b) : value(b) {  // NOLINT
+        xz_mask.clear();
+    }
 
     // shifting msb and lsb
     template <int new_msb, int new_lsb, bool new_signed>
