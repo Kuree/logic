@@ -7,6 +7,10 @@ namespace logic {
 
 template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct logic;
+template <int a, int b, typename T>
+struct slice_ref_fixed;
+template <typename T>
+struct slice_ref_runtime;
 
 template <int msb = 0, int lsb = 0, bool signed_ = false, bool array = false>
 struct bit {
@@ -91,7 +95,18 @@ public:
         }
     }
 
-    void inline set(uint64_t idx, bit<0> v) { value.set(idx, v.value); }
+    void inline set(uint64_t idx, bit<0> v) {
+        auto i = !big_endian ? lsb - idx : idx;
+        if constexpr (native_num) {
+            if (v) {
+                value |= 1ull << i;
+            } else {
+                value &= ~(1ull << i);
+            }
+        } else {
+            value.set(idx, v.value);
+        }
+    }
 
     template <uint64_t idx>
     void set(bit<0> v) requires(!array) {
@@ -157,10 +172,17 @@ public:
         return result;
     }
 
+    template <int a, int b>
+    requires(util::max(a, b) < size) auto inline slice_ref() requires(!array) {
+        return slice_ref_fixed<a, b, decltype(*this)>(*this);
+    }
+
     template <uint32_t size>
     [[nodiscard]] auto slice(int a, int b) const {
         return this->template slice_<size>(a, b);
     }
+
+    auto inline slice_ref(int a, int b) requires(!array) { return slice_ref_runtime(a, b, *this); }
 
     template <uint32_t target_size, bool increase = true, typename T>
     [[nodiscard]] auto slice(T base) const {
@@ -172,6 +194,18 @@ public:
             end = base_value - static_cast<int>(target_size - 1);
         }
         return this->template slice<target_size>(base_value, end);
+    }
+
+    template <uint32_t target_size, bool increase = true, typename T>
+    [[nodiscard]] auto slice_ref(T base) {
+        int end;
+        int base_value = static_cast<int>(base.to_num());
+        if constexpr (increase) {
+            end = base_value + static_cast<int>(target_size - 1);
+        } else {
+            end = base_value - static_cast<int>(target_size - 1);
+        }
+        return this->slice_ref(base_value, end);
     }
 
     // extension
@@ -890,22 +924,31 @@ public:
      * update using slice
      */
     // setting values
-    template <uint64_t hi, uint64_t lo = hi, uint64_t op_hi, uint64_t op_lo, bool op_signed>
+    template <int hi, int lo = hi, int op_hi, int op_lo, bool op_signed>
     void update(const bit<op_hi, op_lo, op_signed> &op) requires(hi < size && lo < size) {
         auto constexpr start = util::min(hi, lo);
         auto constexpr end = util::max(hi, lo) + 1;
         for (auto i = start; i < end; i++) {
             // notice that if it is out of range, 0 will be returned
             // we need to revert the index accessing scheme here, if the endian doesn't match
-            uint64_t idx;
+            int idx;
             if constexpr (bit<op_hi, op_lo>::big_endian ^ big_endian) {
+                // TODO:
+                // FIX bit slicing taking int instead of unsigned
                 idx = util::max(op_lo, op_hi) - i;
             } else {
                 idx = i;
             }
-            auto b = op.operator[](idx);
-            set(i, b);
+            auto b = op.operator[](static_cast<uint64_t>(idx));
+            set(static_cast<uint64_t>(i), b);
         }
+    }
+
+    template <int op_hi, int op_lo, bool op_signed>
+    void update(int hi, int lo, const bit<op_hi, op_lo, op_signed> &op) {
+        auto start = util::min(hi, lo);
+        auto end = util::max(hi, lo) + 1;
+        this->template update_(start, end, op);
     }
 
     /*
@@ -1150,6 +1193,37 @@ protected:
         using TU = typename util::get_holder_type<size, false>::type;
         return std::numeric_limits<TU>::max();
     }
+};
+
+template <int a, int b, typename T>
+struct slice_ref_fixed {
+public:
+    explicit slice_ref_fixed(T &self) : self_(self) {}
+
+    template <typename K>
+    slice_ref_fixed &operator=(const K &value) {
+        self_.template update<a, b>(value);
+        return *this;
+    }
+
+private:
+    T &self_;
+};
+
+template <typename T>
+struct slice_ref_runtime {
+public:
+    slice_ref_runtime(int a, int b, T &self) : a_(a), b_(b), self_(self) {}
+
+    template <typename K>
+    slice_ref_runtime &operator=(const K &value) {
+        self_.template update(a_, b_, value);
+        return *this;
+    }
+
+private:
+    int a_, b_;
+    T &self_;
 };
 
 inline namespace literals {

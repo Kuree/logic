@@ -1287,3 +1287,57 @@ TEST(logic, conversion_num) {  // NOLINT
         EXPECT_EQ(i, 0);
     }
 }
+
+TEST(logic, slice_ref) {
+    {
+        logic::logic<15, 0> a{0xFFFF};
+        auto s = a.slice_ref<3, 0>();
+        s = logic::logic<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFFF0);
+    }
+
+    {
+        logic::logic<15, 0> a{0xFFFF};
+        auto s = a.slice_ref(3, 0);
+        s = logic::logic<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFFF0);
+    }
+
+    {
+        logic::logic<15, 0> a{0xFFFF};
+        logic::logic<3, 0> b{4};
+        auto s = a.slice_ref<4, true>(b);
+        s = logic::logic<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFF0F);
+    }
+}
+
+TEST(bit, slice_ref) {
+    {
+        logic::bit<15, 0> a{0xFFFF};
+        auto s = a.slice_ref<3, 0>();
+        s = logic::bit<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFFF0);
+    }
+
+    {
+        logic::bit<15, 0> a{0xFFFF};
+        auto s = a.slice_ref(3, 0);
+        s = logic::bit<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFFF0);
+    }
+
+    {
+        logic::bit<15, 0> a{0xFFFF};
+        logic::bit<3, 0> b{4};
+        auto s = a.slice_ref<4, true>(b);
+        s = logic::bit<3, 0>(0);
+        auto i = a.to_num();
+        EXPECT_EQ(i, 0xFF0F);
+    }
+}

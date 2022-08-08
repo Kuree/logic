@@ -181,6 +181,11 @@ public:
         return this->template slice_<a, b>();
     }
 
+    template <int a, int b>
+    requires(util::max(a, b) < size) auto inline slice_ref() requires(!array) {
+        return slice_ref_fixed<a, b, decltype(*this)>(*this);
+    }
+
     // used for runtime slice (only used in packed array per SV LRM)
     template <uint32_t target_size>
     logic<target_size - 1, 0> slice(int a, int b) const {
@@ -189,6 +194,8 @@ public:
         result.xz_mask = xz_mask.template slice<target_size>(a, b);
         return result;
     }
+
+    auto inline slice_ref(int a, int b) requires(!array) { return slice_ref_runtime(a, b, *this); }
 
     template <uint32_t target_size, bool increase = true, typename T>
     auto slice(T base) const {
@@ -200,6 +207,18 @@ public:
             end = base_value - static_cast<int>(target_size - 1);
         }
         return this->template slice<target_size>(base_value, end);
+    }
+
+    template <uint32_t target_size, bool increase = true, typename T>
+    auto slice_ref(T base) {
+        int end;
+        int base_value = static_cast<int>(base.to_num());
+        if constexpr (increase) {
+            end = base_value + static_cast<int>(target_size - 1);
+        } else {
+            end = base_value - static_cast<int>(target_size - 1);
+        }
+        return this->slice_ref(base_value, end);
     }
 
     /*
@@ -905,6 +924,13 @@ public:
     requires(!array) void update(const logic<op_hi, op_lo, op_signed> &op) requires(
         hi < size && lo < size && util::match_endian(hi, lo, msb, lsb)) {
         this->template update_<hi, lo>(op);
+    }
+
+    template <int op_hi, int op_lo, bool op_signed>
+    void update(int hi, int lo, const logic<op_hi, op_lo, op_signed> &op) {
+        auto start = util::min(hi, lo);
+        auto end = util::max(hi, lo);
+        this->template update_(start, end, op);
     }
 
     /*
