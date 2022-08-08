@@ -67,6 +67,9 @@ public:
     }
 
     void inline set(int idx, bool v) {
+        if constexpr (!big_endian) {
+            idx = lsb - idx;
+        }
         auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
@@ -81,7 +84,8 @@ public:
 
     template <int idx>
     void set(bool v) requires(!array) {
-        constexpr auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
+        constexpr auto idx_ = big_endian ? idx : (lsb - idx);
+        constexpr auto i = static_cast<uint64_t>(idx_ - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
                 value |= 1ull << i;
@@ -94,6 +98,9 @@ public:
     }
 
     void inline set(int idx, bit<0> v) {
+        if constexpr (!big_endian) {
+            idx = lsb - idx;
+        }
         auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
@@ -113,7 +120,8 @@ public:
 
     template <int idx, bool v>
     void set() requires(!array) {
-        constexpr auto i = idx - util::min(lsb, msb);
+        auto constexpr idx_ = big_endian ? idx : (lsb - idx);
+        constexpr auto i = idx_ - util::min(lsb, msb);
         if constexpr (native_num) {
             if constexpr (v) {
                 value |= 1ull << i;
@@ -943,7 +951,7 @@ public:
     template <int op_hi, int op_lo, bool op_signed>
     void update(int hi, int lo, const bit<op_hi, op_lo, op_signed> &op) {
         auto start = util::min(hi, lo);
-        auto end = util::max(hi, lo) + 1;
+        auto end = util::max(hi, lo);
         this->template update_(start, end, op);
     }
 
