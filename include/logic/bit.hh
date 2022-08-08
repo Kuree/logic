@@ -44,21 +44,21 @@ public:
     }
 
     // single bit
-    bit<0> inline operator[](uint64_t idx) const requires(!array) { return get_(idx); }
+    bit<0> inline operator[](int idx) const requires(!array) { return get_(idx); }
 
-    template <uint64_t idx>
+    template <int idx>
     requires(idx < size && native_num) [[nodiscard]] bit<0> inline get() const requires(!array) {
         return this->operator[](idx);
     }
 
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
     bool inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
-        uint64_t index;
+        int index;
         if constexpr (bit<op_msb, op_lsb>::native_num) {
-            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+            index = op.value - util::min(msb, lsb);
         } else {
             if (op.fit_in_64()) {
-                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+                index = op.value.value[0] - util::min(msb, lsb);
             } else {
                 return false;
             }
@@ -66,24 +66,22 @@ public:
         return get_(index);
     }
 
-    void inline set(uint64_t idx, bool v) {
-        if constexpr (!big_endian) {
-            idx = lsb - idx;
-        }
+    void inline set(int idx, bool v) {
+        auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
-                value |= 1ull << idx;
+                value |= 1ull << i;
             } else {
-                value &= ~(1ull << idx);
+                value &= ~(1ull << i);
             }
         } else {
-            value.set(idx, v);
+            value.set(i, v);
         }
     }
 
-    template <uint64_t idx>
+    template <int idx>
     void set(bool v) requires(!array) {
-        constexpr auto i = !big_endian ? lsb - idx : idx;
+        constexpr auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
                 value |= 1ull << i;
@@ -95,8 +93,8 @@ public:
         }
     }
 
-    void inline set(uint64_t idx, bit<0> v) {
-        auto i = !big_endian ? lsb - idx : idx;
+    void inline set(int idx, bit<0> v) {
+        auto i = static_cast<uint64_t>(idx - util::min(lsb, msb));
         if constexpr (native_num) {
             if (v) {
                 value |= 1ull << i;
@@ -108,14 +106,14 @@ public:
         }
     }
 
-    template <uint64_t idx>
+    template <int idx>
     void set(bit<0> v) requires(!array) {
         this->template set<idx>(v.value);
     }
 
-    template <uint64_t idx, bool v>
+    template <int idx, bool v>
     void set() requires(!array) {
-        constexpr auto i = !big_endian ? lsb - idx : idx;
+        constexpr auto i = idx - util::min(lsb, msb);
         if constexpr (native_num) {
             if constexpr (v) {
                 value |= 1ull << i;
@@ -933,14 +931,12 @@ public:
             // we need to revert the index accessing scheme here, if the endian doesn't match
             int idx;
             if constexpr (bit<op_hi, op_lo>::big_endian ^ big_endian) {
-                // TODO:
-                // FIX bit slicing taking int instead of unsigned
                 idx = util::max(op_lo, op_hi) - i;
             } else {
                 idx = i;
             }
-            auto b = op.operator[](static_cast<uint64_t>(idx));
-            set(static_cast<uint64_t>(i), b);
+            auto b = op.operator[](idx);
+            set(i, b);
         }
     }
 
@@ -1011,7 +1007,7 @@ public:
         : value(big_num.values[0]) {}
 
     template <uint64_t op_hi, uint64_t op_lo, bool op_signed>
-    constexpr bit(logic<op_hi, op_lo, op_signed> &&logic) {
+    constexpr bit(logic<op_hi, op_lo, op_signed> &&logic) {  // NOLINT
         *this = logic.value;
     }
 

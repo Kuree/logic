@@ -51,8 +51,8 @@ public:
     /*
      * single bit
      */
-    inline logic<0> operator[](uint64_t idx) const requires(!array) {
-        if (idx < size) [[likely]] {
+    inline logic<0> operator[](int idx) const requires(!array) {
+        if (idx <= util::max(msb, lsb) && idx >= util::min(msb, lsb)) [[likely]] {
             logic<0> r;
             if (x_set(idx)) [[unlikely]] {
                 r.set_x(idx);
@@ -69,7 +69,7 @@ public:
         }
     }
 
-    template <uint64_t idx>
+    template <int idx>
     requires(idx < size) [[nodiscard]] inline logic<0> get() const requires(!array) {
         logic<0> r{false};
         if (this->template x_set<idx>()) [[unlikely]] {
@@ -85,12 +85,12 @@ public:
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
     logic<0> inline get(const logic<op_msb, op_lsb, op_signed, op_array> &op) const
         requires(!array) {
-        uint64_t index;
+        int index;
         if constexpr (util::native_num(util::total_size(msb, lsb))) {
-            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+            index = op.value - util::min(msb, lsb);
         } else {
             if (op.fit_in_64() && !op.xz_mask.any_set()) {
-                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+                index = op.value.value[0] - util::min(msb, lsb);
             } else {
                 return x_();
             }
@@ -100,12 +100,12 @@ public:
 
     template <int op_msb, int op_lsb, bool op_signed, bool op_array>
     logic<0> inline get(const bit<op_msb, op_lsb, op_signed, op_array> &op) const requires(!array) {
-        uint64_t index;
+        int index;
         if constexpr (util::native_num(util::total_size(msb, lsb))) {
-            index = static_cast<uint64_t>(op.value - util::min(msb, lsb));
+            index = op.value - util::min(msb, lsb);
         } else {
             if (op.fit_in_64()) {
-                index = static_cast<uint64_t>(op.value.value[0] - util::min(msb, lsb));
+                index = op.value.value[0] - util::min(msb, lsb);
             } else {
                 return x_();
             }
@@ -113,60 +113,60 @@ public:
         return operator[](index);
     }
 
-    void set(uint64_t idx, bool v) requires(!array) {
+    void set(int idx, bool v) requires(!array) {
         value.set(idx, v);
         // unmask bit
         unmask_bit(idx);
     }
 
-    template <uint64_t idx>
+    template <int idx>
     void set(bool v) requires(!array) {
         value.template set<idx>(v);
         this->template unmask_bit<idx>();
     }
 
-    template <uint64_t idx, bool v>
+    template <int idx, bool v>
     void set() requires(!array) {
         value.template set<idx, v>();
         this->template unmask_bit<idx>();
     }
 
     template <bool l_signed>
-    void set(uint64_t idx, const logic<0, 0, l_signed> &l) requires(!array) {
+    void set(int idx, const logic<0, 0, l_signed> &l) requires(!array) {
         set_(idx, l);
     }
 
-    [[nodiscard]] inline bool x_set(uint64_t idx) const { return xz_mask[idx] && !value[idx]; }
+    [[nodiscard]] inline bool x_set(int idx) const { return xz_mask[idx] && !value[idx]; }
 
-    template <uint64_t idx>
+    template <int idx>
     [[nodiscard]] inline bool x_set() const {
         return xz_mask.template get<idx>() && !value.template get<idx>();
     }
 
-    [[nodiscard]] inline bool z_set(uint64_t idx) const { return xz_mask[idx] && value[idx]; }
+    [[nodiscard]] inline bool z_set(int idx) const { return xz_mask[idx] && value[idx]; }
 
-    template <uint64_t idx>
+    template <int idx>
     [[nodiscard]] inline bool z_set() const {
         return xz_mask.template get<idx>() && value.template get<idx>();
     }
 
-    inline void set_x(uint64_t idx) {
+    inline void set_x(int idx) {
         xz_mask.set(idx, true);
         value.set(idx, false);
     }
 
-    template <uint64_t idx>
+    template <int idx>
     inline void set_x() {
         xz_mask.template set<idx, true>();
         value.template set<idx, false>();
     }
 
-    inline void set_z(uint64_t idx) {
+    inline void set_z(int idx) {
         xz_mask.set(idx, true);
         value.set(idx, true);
     }
 
-    template <uint64_t idx>
+    template <int idx>
     inline void set_z() {
         xz_mask.template set<idx, true>();
         value.template set<idx, true>();
